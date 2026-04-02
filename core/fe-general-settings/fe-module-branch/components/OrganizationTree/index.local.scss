@@ -1,0 +1,161 @@
+.organization-tree {
+  overflow: auto;
+  height: calc(100vh - 200px);
+  padding-top: 20px;
+
+  .ant-tree-node-content-wrapper {
+    margin-left: -50px !important;
+  }
+
+  .ant-tree-switcher-leaf-line {
+    display: none !important;
+  }
+
+  .ant-tree-switcher-icon {
+    position: absolute;
+    bottom: -12px;
+    left: 10px;
+    z-index: 1;
+  }
+
+  .ant-tree-switcher_close .ant-tree-switcher-icon svg {
+    transform: rotate(180deg) !important;
+  }
+
+  .ant-tree-treenode {
+    padding-bottom: 42px !important;
+  }
+
+  .ant-tree-treenode:hover {
+    background-color: transparent !important;
+  }
+
+  .ant-tree-show-line .ant-tree-indent-unit {
+    transition: none !important;
+  }
+
+  .ant-tree-show-line .ant-tree-indent-unit:before {
+    top: -32px !important;
+    bottom: -72px !important;
+    border-inline-end: 1px solid #004680 !important;
+  }
+
+  .ant-tree-indent-unit-end {
+    position: relative;
+    height: 100%;
+
+    &:before {
+      position: absolute;
+      display: block !important;
+      content: "" !important;
+      inset-inline-end: calc(var(--ant-tree-title-height) / 2);
+    }
+  }
+
+  .ant-tree-switcher {
+    button {
+      background: #004680 !important;
+    }
+  }
+
+  .ant-tree-treenode-leaf-last {
+    .ant-tree-indent {
+      span:last-child::before {
+        bottom: calc(100% - 44px) !important;
+      }
+    }
+  }
+
+  .ant-tree-node-content-wrapper {
+    position: relative;
+  }
+
+  .ant-tree-node-content-wrapper.ant-tree-node-selected {
+    background: none !important;
+  }
+  .ant-tree-node-content-wrapper:hover {
+    background: none !important;
+  }
+
+  .ant-tree-icon__customize {
+    position: absolute;
+    left: -20px;
+    top: 32px;
+    z-index: 1;
+    fill: #004680;
+  }
+
+  .custom-tree {
+    width: 450px;
+    min-width: 450px;
+    max-width: 450px;
+
+    display: inline-block;
+  }
+
+  .organization {
+    position: relative;
+    margin-bottom: 48px;
+
+    &::before {
+      content: "";
+      width: 100%;
+      height: 32px;
+      position: absolute;
+      bottom: -16px;
+
+      transform: translateX(-50%);
+      border-inline-end: 1px solid #004680;
+    }
+
+    &::after {
+      content: "";
+      position: absolute;
+      bottom: -16px;
+      left: 5px;
+      right: 5px;
+
+      border-bottom: 1px solid #004680 !important;
+    }
+  }
+
+  .organization-tree-indent {
+    $n: 99;
+    @for $i from 1 through $n {
+      .organization-tree-indent-unit:nth-child(#{$i}) {
+        border-inline-end: 1px solid #004680;
+        height: 72px;
+        position: absolute;
+        bottom: -88px;
+        z-index: 1;
+        @if $i == 1 {
+          left: 5px;
+        } @else {
+          left: 450px * ($i - 1) + 5px;
+        }
+      }
+    }
+  }
+
+  $d: 10;
+  @for $i from 1 through $d {
+    .indent-#{$i}-hidden {
+      .ant-tree-indent {
+        span:nth-child(#{$i})::before {
+          display: none !important;
+        }
+      }
+    }
+    @for $j from 1 through $i {
+      .depth-#{$i} .ant-tree-indent-unit-start:nth-child(#{$j})::before {
+        right: calc((#{$i - $j}) * 28px + 30px);
+      }
+      .depth-#{$i} .ant-tree-indent-unit-end:nth-child(#{$j})::before {
+        right: calc((#{$i - $j}) * 28px + 30px);
+      }
+      .depth-#{$i} .ant-tree-indent-unit:nth-child(#{$j})::before {
+        right: calc((#{$i - $j}) * 28px + 30px);
+      }
+    }
+  }
+}

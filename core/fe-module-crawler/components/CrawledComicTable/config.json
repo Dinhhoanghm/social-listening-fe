@@ -1,0 +1,86 @@
+{
+  "search": {
+    "title": "Tìm kiếm",
+    "props": {
+      "placeholder": "Tìm kiếm theo tên"
+    },
+    "name": "keyword",
+    "operation": "in",
+    "type": "Input"
+  },
+  "filters": [
+    {
+      "title": "Cấu hình",
+      "type": "Select",
+      "props": {
+        "placeholder": "Tất cả",
+        "fieldNames": {
+          "label": "label",
+          "value": "value"
+        },
+        "allowClear": true,
+        "style": {
+          "minWidth": 240
+        }
+      },
+      "isAdmin": true,
+      "name": "crawlerId",
+      "operation": "eq",
+      "urlApi": "https://api.s8truyen.com/crawler-service/api/v1/crawler-configs/select",
+      "pin": true
+    }
+  ],
+  "sorts": {
+    "showLabel": true,
+    "values": [
+      {
+        "property": "createdAt",
+        "label": "Ngày tạo",
+        "direction": [
+          "DESC",
+          "ASC"
+        ]
+      },
+      {
+        "property": "numCoin",
+        "label": "Số coin",
+        "direction": [
+          "DESC",
+          "ASC"
+        ]
+      },
+      {
+        "property": "crawledChapterCount",
+        "label": "Số chương (đã cào)",
+        "direction": [
+          "DESC",
+          "ASC"
+        ]
+      },
+      {
+        "property": "chapterCounts",
+        "label": "Số chương",
+        "direction": [
+          "DESC",
+          "ASC"
+        ]
+      },
+      {
+        "property": "pageCounts",
+        "label": "Số trang",
+        "direction": [
+          "DESC",
+          "ASC"
+        ]
+      },
+      {
+        "property": "frequencyHour",
+        "label": "Tần suất",
+        "direction": [
+          "DESC",
+          "ASC"
+        ]
+      }
+    ]
+  }
+}

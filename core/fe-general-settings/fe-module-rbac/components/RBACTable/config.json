@@ -1,0 +1,72 @@
+{
+  "search": {
+    "title": "Tìm kiếm",
+    "props": {
+      "placeholder": "Nhập nội dung tìm kiếm"
+    },
+    "name": "keyword",
+    "operation": "in",
+    "fieldsSearch": [
+      {
+        "name": "name",
+        "operation": "LIKE"
+      },
+      {
+        "name": "code",
+        "operation": "LIKE"
+      }
+    ],
+    "type": "Input"
+  },
+  "filters": [
+    {
+      "title": "Hoạt động",
+      "type": "Select",
+      "props": {
+        "placeholder": "Tất cả",
+        "options": [
+          { "label": "Đang hoạt động", "value": true },
+          { "label": "Dừng hoạt động", "value": false }
+        ]
+      },
+      "name": "isActive",
+      "operation": "eq",
+      "pin": true
+    }
+  ],
+  "sorts": {
+    "showLabel": false,
+    "values": [
+      {
+        "label": "Sắp xếp từ mới đến cũ",
+        "direction": "DESC",
+        "property": "createdAt"
+      },
+      {
+        "label": "Sắp xếp từ cũ đến mới",
+        "direction": "ASC",
+        "property": "createdAt"
+      },
+      {
+        "label": "Sắp xếp mã dự án từ A - Z",
+        "direction": "ASC",
+        "property": "code"
+      },
+      {
+        "label": "Sắp xếp mã dự án từ Z - A",
+        "direction": "DESC",
+        "property": "code"
+      },
+      {
+        "label": "Sắp xếp tên dự án từ A - Z",
+        "direction": "ASC",
+        "property": "name"
+      },
+      {
+        "label": "Sắp xếp tên dự án từ Z - A",
+        "direction": "DESC",
+        "property": "name"
+      }
+    ]
+  }
+}

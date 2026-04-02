@@ -1,0 +1,117 @@
+{
+  "search": {
+    "props": {
+      "placeholder": "Tìm kiếm theo tên"
+    },
+    "fieldsSearch": [
+      "name",
+      "url"
+    ]
+  },
+  "filters": [
+    {
+      "title": "Trạng thái",
+      "name": "isActive",
+      "operation": "eq",
+      "type": "Select",
+      "props": {
+        "placeholder": "Chọn trạng thái",
+        "options": [
+          {
+            "label": "Đang hoạt động",
+            "value": true
+          },
+          {
+            "label": "Dừng hoạt động",
+            "value": false
+          }
+        ]
+      },
+      "pin": true
+    },
+    {
+      "title": "Loại Crawler",
+      "name": "crawlerType",
+      "operation": "eq",
+      "type": "Select",
+      "props": {
+        "placeholder": "Chọn loại crawler",
+        "options": [
+          {
+            "label": "WEB",
+            "value": "WEB"
+          },
+          {
+            "label": "API",
+            "value": "API"
+          },
+          {
+            "label": "DOCUMENT",
+            "value": "DOCUMENT"
+          }
+        ]
+      },
+      "pin": false
+    },
+    {
+      "title": "Loại truyện",
+      "name": "storyType",
+      "operation": "eq",
+      "type": "Select",
+      "props": {
+        "placeholder": "Chọn loại truyện",
+        "options": [
+          {
+            "label": "Truyện tranh",
+            "value": "comic"
+          },
+          {
+            "label": "Truyện chữ",
+            "value": "novel"
+          }
+        ]
+      },
+      "pin": false
+    },
+    {
+      "title": "Tần suất (giờ)",
+      "name": "frequencyHour",
+      "operation": "eq",
+      "type": "Input",
+      "props": {
+        "placeholder": "Nhập tần suất",
+        "type": "number"
+      },
+      "pin": false
+    }
+  ],
+  "sorts": {
+    "showLabel": true,
+    "values": [
+      {
+        "property": "createdAt",
+        "label": "Ngày tạo",
+        "direction": [
+          "DESC",
+          "ASC"
+        ]
+      },
+      {
+        "property": "updatedAt",
+        "label": "Lần sửa cuối",
+        "direction": [
+          "DESC",
+          "ASC"
+        ]
+      },
+      {
+        "property": "frequencyHour",
+        "label": "Tần suất",
+        "direction": [
+          "DESC",
+          "ASC"
+        ]
+      }
+    ]
+  }
+}

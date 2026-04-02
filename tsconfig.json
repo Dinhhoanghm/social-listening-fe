@@ -19,7 +19,13 @@
       }
     ],
     "paths": {
-      "@/*": ["./*"]
+      "@/*": ["./*"],
+      "@/fe-base/*": ["./core/fe-base/*"],
+      "@/fe-cores/*": ["./core/fe-cores/*"],
+      "@/fe-component/*": ["./core/fe-component/*"],
+      "@/fe-global/*": ["./core/fe-global/*"],
+      "@/fe-module-auth/*": ["./core/fe-module-auth/*"],
+      "@/fe-module-crawler/*": ["./core/fe-module-crawler/*"]
     }
   },
   "include": [

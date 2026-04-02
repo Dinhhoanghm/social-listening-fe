@@ -1,0 +1,35 @@
+[
+    {
+      key: 'view',
+      label: 'Xem',
+      icon: <EyeOutlined />,
+      permissionKey: 'view',
+      onClick: handleView,
+      pin: true
+    },
+    {
+      key: 'edit',
+      label: 'Sửa',
+      icon: <EditOutlined />,
+      permissionKey: 'edit',
+      onClick: handleEdit,
+      pin: true
+    },
+    {
+      key: 'delete',
+      label: 'Xóa',
+      icon: <DeleteOutlined />,
+      danger: true,
+      permissionKey: 'delete',
+      onClick: handleDelete,
+      pin: false
+    },
+    {
+      key: 'print',
+      label: 'In',
+      icon: <PrintOutlined />,
+      permissionKey: 'view',
+      onClick: (user) => console.log('Print user:', user),
+      pin: false
+    }
+  ]

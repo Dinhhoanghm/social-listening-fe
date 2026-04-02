@@ -1,0 +1,87 @@
+{
+  "search": {
+    "title": "Tìm kiếm",
+    "type": "Input",
+    "props": {
+      "placeholder": "Nhập nội dung tìm kiếm"
+    },
+    "name": "keyword",
+    "operation": "in",
+    "fieldsSearch": [
+      {
+        "name": "full_name",
+        "operation": "LIKE_IGNORE_CASE"
+      },
+      {
+        "name": "username",
+        "operation": "LIKE_IGNORE_CASE"
+      },
+      {
+        "name": "code",
+        "operation": "LIKE_IGNORE_CASE"
+      }
+    ]
+  },
+  "filters": [
+    {
+      "title": "Hoạt động",
+      "type": "Select",
+      "props": {
+        "placeholder": "Tất cả",
+        "options": [
+          { "label": "Đang hoạt động", "value": true },
+          { "label": "Dừng hoạt động", "value": false }
+        ]
+      },
+      "name": "isActive",
+      "operation": "eq",
+      "urlApi": "",
+      "pin": true
+    }
+  ],
+  "sorts": {
+    "showLabel": false,
+    "values": [
+      {
+        "property": "createdAt",
+        "label": "Sắp xếp từ mới đến cũ",
+        "direction": "DESC"
+      },
+      {
+        "property": "createdAt",
+        "label": "Sắp xếp từ cũ đến mới",
+        "direction": "ASC"
+      },
+      {
+        "property": "code",
+        "label": "Sắp xếp mã tài khoản từ A - Z",
+        "direction": "ASC"
+      },
+      {
+        "property": "code",
+        "label": "Sắp xếp mã tài khoản từ Z - A",
+        "direction": "DESC"
+      },
+      {
+        "property": "username",
+        "label": "Sắp xếp tài khoản từ A - Z",
+        "direction": "ASC"
+      },
+      {
+        "property": "username",
+        "label": "Sắp xếp tài khoản từ Z - A",
+        "direction": "DESC"
+      },
+      {
+        "property": "fullName",
+        "label": "Sắp xếp họ và tên từ A - Z",
+        "direction": "ASC"
+      },
+      {
+        "property": "fullName",
+        "label": "Sắp xếp họ và tên từ Z - A",
+        "direction": "DESC"
+      }
+    ]
+  }
+}
