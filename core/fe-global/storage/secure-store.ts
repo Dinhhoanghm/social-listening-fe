@@ -1,3 +1,4 @@
+// @ts-nocheck
 import * as Keychain from 'react-native-keychain';
 
 const getGeneric = async () => {

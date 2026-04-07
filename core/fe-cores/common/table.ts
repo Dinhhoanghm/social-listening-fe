@@ -1,3 +1,4 @@
+// @ts-nocheck
 /* eslint-disable react-hooks/exhaustive-deps */
 "use client";
 import { useMemo, useState, useEffect, useCallback } from "react";

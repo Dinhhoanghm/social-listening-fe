@@ -28,7 +28,6 @@ import {
 } from "@ant-design/icons";
 import { useRouter } from "next/navigation";
 import { useMemo, useState } from "react";
-import AdminLayout from "@/components/admin/AdminLayout";
 import { CRAWLER_TYPE_OPTIONS } from "@/lib/constants/crawler";
 import { getSourceLabelFromParameters } from "@/lib/parameters";
 import {
@@ -288,7 +287,7 @@ export default function CrawlerConfigListPage() {
   );
 
   return (
-    <AdminLayout breadcrumbItems={[{ title: "Danh sách cấu hình" }]}>
+    <>
       <Card
         title="Cấu hình crawler"
         styles={{ body: { paddingTop: 16 } }}
@@ -412,6 +411,6 @@ export default function CrawlerConfigListPage() {
         onCancel={() => setCreateOpen(false)}
         onSubmit={handleCreate}
       />
-    </AdminLayout>
+    </>
   );
 }

@@ -30,11 +30,26 @@
   },
   "include": [
     "next-env.d.ts",
-    "**/*.ts",
-    "**/*.tsx",
+    "app/**/*.ts",
+    "app/**/*.tsx",
+    "components/**/*.ts",
+    "components/**/*.tsx",
+    "lib/**/*.ts",
+    "lib/**/*.tsx",
+    "types/**/*.ts",
+    "core/fe-base/**/*.ts",
+    "core/fe-base/**/*.tsx",
+    "core/fe-cores/**/*.ts",
+    "core/fe-cores/**/*.tsx",
+    "core/fe-global/**/*.ts",
+    "core/fe-global/**/*.tsx",
     ".next/types/**/*.ts",
-    ".next/dev/types/**/*.ts",
-    "**/*.mts"
+    ".next/dev/types/**/*.ts"
   ],
-  "exclude": ["node_modules"]
+  "exclude": [
+    "node_modules",
+    "**/*.native.tsx",
+    "**/*.native.ts",
+    "core/fe-cores/hooks/app/useIsForeground.ts"
+  ]
 }

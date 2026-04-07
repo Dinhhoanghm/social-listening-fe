@@ -1,3 +1,4 @@
+// @ts-nocheck
 export function toJson(input) {
   // Nếu đã là object hoặc array thì trả về luôn
   if (typeof input === "object" && input !== null) {

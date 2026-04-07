@@ -30,29 +30,31 @@ import {
   EditOutlined,
   PlusOutlined,
 } from "@ant-design/icons";
-import Link from "next/link";
 import { useParams, useRouter } from "next/navigation";
 import { useEffect, useMemo, useState } from "react";
-import AdminLayout from "@/components/admin/AdminLayout";
 import {
   CRAWLER_TYPE_OPTIONS,
-  LOCATOR_TYPES,
+  OUTPUT_URL_TYPE_OPTIONS,
   PARSE_TYPES,
   REQUEST_METHODS,
   STEP_TYPE_OPTIONS,
 } from "@/lib/constants/crawler";
 import FieldFormModal from "./FieldFormModal";
+import LocatorFormModal from "./LocatorFormModal";
 import {
   useAddCrawlerFieldMutation,
   useAddCrawlerStepMutation,
+  useAddCrawlerStepLocatorMutation,
   useDeleteCrawlerFieldMutation,
   useDeleteCrawlerStepMutation,
+  useDeleteCrawlerStepLocatorMutation,
   useGetCrawlerConfigDetailQuery,
   useSearchCrawlerSourcesQuery,
   useSearchCustomScriptsQuery,
   useUpdateCrawlerConfigMutation,
   useUpdateCrawlerFieldMutation,
   useUpdateCrawlerStepMutation,
+  useUpdateCrawlerStepLocatorMutation,
 } from "@/lib/store/apis/crawlerApi";
 import {
   mergeParametersJson,
@@ -64,6 +66,8 @@ import type {
   CrawlerFieldRequestBody,
   CrawlerFieldRow,
   CrawlerParametersPayload,
+  CrawlerStepLocatorRequestBody,
+  CrawlerStepLocatorRow,
   CrawlerStepModel,
   CrawlerStepRequestBody,
 } from "@/types/crawler";
@@ -78,12 +82,20 @@ export default function CrawlerConfigDetailPage() {
 
   const [form] = Form.useForm();
   const [stepForm] = Form.useForm();
+  const watchedStepType = Form.useWatch("stepType", stepForm);
+  const watchedBrowser = Form.useWatch("browser", stepForm);
   const [stepModalOpen, setStepModalOpen] = useState(false);
   const [editingStep, setEditingStep] = useState<CrawlerStepModel | null>(null);
   const [fieldsDrawerStep, setFieldsDrawerStep] =
     useState<CrawlerStepModel | null>(null);
   const [fieldModalOpen, setFieldModalOpen] = useState(false);
   const [editingField, setEditingField] = useState<CrawlerFieldRow | null>(null);
+
+  const [locatorsDrawerStep, setLocatorsDrawerStep] =
+    useState<CrawlerStepModel | null>(null);
+  const [locatorModalOpen, setLocatorModalOpen] = useState(false);
+  const [editingLocator, setEditingLocator] =
+    useState<CrawlerStepLocatorRow | null>(null);
 
   const skip = !Number.isFinite(id) || id <= 0;
 
@@ -103,6 +115,11 @@ export default function CrawlerConfigDetailPage() {
   const [updateField, { isLoading: updatingField }] =
     useUpdateCrawlerFieldMutation();
   const [deleteField] = useDeleteCrawlerFieldMutation();
+  const [addLocator, { isLoading: addingLocator }] =
+    useAddCrawlerStepLocatorMutation();
+  const [updateLocator, { isLoading: updatingLocator }] =
+    useUpdateCrawlerStepLocatorMutation();
+  const [deleteLocator] = useDeleteCrawlerStepLocatorMutation();
 
   const sourceSearchBody = useMemo(() => ({ page: 1, pageSize: 500 }), []);
   const { data: sourcesPage } = useSearchCrawlerSourcesQuery(sourceSearchBody);
@@ -155,6 +172,24 @@ export default function CrawlerConfigDetailPage() {
         (a, b) => (a.stepOrder ?? 0) - (b.stepOrder ?? 0)
       ),
     [detail?.crawlerSteps]
+  );
+
+  // Always derive the live step from the up-to-date `steps` array so that
+  // the drawers reflect data after RTK Query refetches on mutation.
+  const liveFieldsStep = useMemo(
+    () =>
+      fieldsDrawerStep?.id
+        ? (steps.find((s) => s.id === fieldsDrawerStep.id) ?? fieldsDrawerStep)
+        : fieldsDrawerStep,
+    [fieldsDrawerStep, steps]
+  );
+
+  const liveLocatorsStep = useMemo(
+    () =>
+      locatorsDrawerStep?.id
+        ? (steps.find((s) => s.id === locatorsDrawerStep.id) ?? locatorsDrawerStep)
+        : locatorsDrawerStep,
+    [locatorsDrawerStep, steps]
   );
 
   const saveConfig = async () => {
@@ -221,45 +256,83 @@ export default function CrawlerConfigDetailPage() {
       requestMethod: "GET",
       delaySeconds: 0,
       extraConfigText: "",
+      browser: "selenium",
+      multiloginFolderId: "",
+      multiloginProfileId: "",
+      loginUrl: "",
+      loginEmail: "",
+      loginPassword: "",
     });
     setStepModalOpen(true);
   };
 
   const openEditStep = (s: CrawlerStepModel) => {
     setEditingStep(s);
+    let cfg: Record<string, unknown> = {};
+    try {
+      const raw = typeof s.extraConfig === "string" ? s.extraConfig : JSON.stringify(s.extraConfig ?? {});
+      cfg = JSON.parse(raw);
+    } catch { /* ignore */ }
     stepForm.setFieldsValue({
       ...s,
       stepType: (s.stepType ?? "fetch").toLowerCase(),
-      extraConfigText:
-        typeof s.extraConfig === "string"
-          ? s.extraConfig
-          : s.extraConfig != null
-            ? JSON.stringify(s.extraConfig, null, 2)
-            : "",
+      extraConfigText: cfg && Object.keys(cfg).length > 0 ? JSON.stringify(cfg, null, 2) : "",
+      // Browser config fields
+      browser: (cfg.browser as string) ?? "selenium",
+      multiloginFolderId: (cfg.multilogin_folder_id as string) ?? "",
+      multiloginProfileId: (cfg.multilogin_profile_id as string) ?? "",
+      loginUrl: (cfg.login_url as string) ?? "",
+      loginEmail: (cfg.login_email as string) ?? "",
+      loginPassword: (cfg.login_password as string) ?? "",
     });
     setStepModalOpen(true);
   };
 
+  const BROWSER_STEP_TYPES = ["navigate", "interact", "python_crawl"];
+
   const saveStep = async () => {
     const v = await stepForm.validateFields();
     let extraConfig: string | undefined;
+
+    // Parse existing raw JSON (if any)
+    let configObj: Record<string, unknown> = {};
     if (v.extraConfigText?.trim()) {
       try {
-        JSON.parse(v.extraConfigText);
-        extraConfig = v.extraConfigText.trim();
+        configObj = JSON.parse(v.extraConfigText);
       } catch {
-        message.error("extraConfig phải là JSON hợp lệ");
+        message.error("Cấu hình nâng cao (JSON) không hợp lệ");
         return;
       }
     }
+
+    // Merge structured browser-config fields for browser-based steps
+    if (BROWSER_STEP_TYPES.includes(v.stepType)) {
+      if (v.browser && v.browser !== "selenium") configObj.browser = v.browser;
+      else delete configObj.browser; // "selenium" is the default — no need to persist it
+
+      if (v.browser === "multilogin") {
+        if (v.multiloginFolderId?.trim()) configObj.multilogin_folder_id = v.multiloginFolderId.trim();
+        if (v.multiloginProfileId?.trim()) configObj.multilogin_profile_id = v.multiloginProfileId.trim();
+      } else {
+        delete configObj.multilogin_folder_id;
+        delete configObj.multilogin_profile_id;
+      }
+
+      if (v.loginUrl?.trim()) configObj.login_url = v.loginUrl.trim();
+      else delete configObj.login_url;
+      if (v.loginEmail?.trim()) configObj.login_email = v.loginEmail.trim();
+      else delete configObj.login_email;
+      if (v.loginPassword?.trim()) configObj.login_password = v.loginPassword.trim();
+      else delete configObj.login_password;
+    }
+
+    extraConfig = Object.keys(configObj).length > 0 ? JSON.stringify(configObj) : undefined;
     const base: CrawlerStepRequestBody = {
       crawlerConfigId: id,
       stepOrder: v.stepOrder,
       stepName: v.stepName,
       stepType: v.stepType,
       requestMethod: v.requestMethod,
-      locatorType: v.locatorType,
-      locatorValue: v.locatorValue,
       outputUrlType: v.outputUrlType,
       delaySeconds: v.delaySeconds ?? 0,
       customScriptId: v.customScriptId ?? null,
@@ -295,7 +368,7 @@ export default function CrawlerConfigDetailPage() {
   };
 
   const saveField = async (body: CrawlerFieldRequestBody) => {
-    if (!fieldsDrawerStep?.id) {
+    if (!liveFieldsStep?.id) {
       message.error("Bước chưa có id — lưu pipeline trước");
       return;
     }
@@ -356,19 +429,81 @@ export default function CrawlerConfigDetailPage() {
     });
   };
 
+  const openLocatorsDrawer = (s: CrawlerStepModel) => {
+    setLocatorsDrawerStep(s);
+  };
+
+  const openAddLocator = () => {
+    setEditingLocator(null);
+    setLocatorModalOpen(true);
+  };
+
+  const openEditLocator = (loc: CrawlerStepLocatorRow) => {
+    setEditingLocator(loc);
+    setLocatorModalOpen(true);
+  };
+
+  const saveLocator = async (body: CrawlerStepLocatorRequestBody) => {
+    if (!liveLocatorsStep?.id) return;
+    try {
+      if (editingLocator?.id) {
+        await updateLocator({
+          id: editingLocator.id,
+          body,
+          crawlerConfigId: id,
+        }).unwrap();
+        message.success("Đã cập nhật locator");
+      } else {
+        await addLocator({ body, crawlerConfigId: id }).unwrap();
+        message.success("Đã thêm locator");
+      }
+      setLocatorModalOpen(false);
+      setEditingLocator(null);
+    } catch (e) {
+      message.error(e instanceof Error ? e.message : "Lưu locator thất bại");
+    }
+  };
+
+  const removeLocator = (loc: CrawlerStepLocatorRow) => {
+    if (!loc.id) return;
+    modal.confirm({
+      title: "Xóa locator?",
+      content: `${loc.locatorType}: ${loc.locatorValue}`,
+      okText: "Xóa",
+      cancelText: "Hủy",
+      okType: "danger",
+      onOk: async () => {
+        try {
+          await deleteLocator({ id: loc.id!, crawlerConfigId: id }).unwrap();
+          message.success("Đã xóa locator");
+        } catch (e) {
+          message.error(e instanceof Error ? e.message : "Xóa thất bại");
+        }
+      },
+    });
+  };
+
   const stepColumns: ColumnsType<CrawlerStepModel> = [
     { title: "TT", dataIndex: "stepOrder", width: 60 },
     { title: "Tên", dataIndex: "stepName", width: 160, ellipsis: true },
-    { title: "Loại", dataIndex: "stepType", width: 110, render: (t) => <Tag>{t}</Tag> },
+    {
+      title: "Loại",
+      dataIndex: "stepType",
+      width: 120,
+      render: (t: string) => {
+        const opt = STEP_TYPE_OPTIONS.find((o) => o.value === t);
+        return <Tag title={opt?.hint}>{opt?.label ?? t}</Tag>;
+      },
+    },
     { title: "Method", dataIndex: "requestMethod", width: 80 },
     {
-      title: "Locator",
-      key: "loc",
-      ellipsis: true,
+      title: "Locators",
+      width: 110,
+      align: "center",
       render: (_, s) => (
-        <Text type="secondary">
-          {(s.locatorType ?? "") + ": " + (s.locatorValue ?? "").slice(0, 80)}
-        </Text>
+        <Button type="link" onClick={() => openLocatorsDrawer(s)}>
+          {s.locators?.length ?? 0} locator
+        </Button>
       ),
     },
     {
@@ -420,28 +555,21 @@ export default function CrawlerConfigDetailPage() {
 
   if (!Number.isFinite(id)) {
     return (
-      <AdminLayout breadcrumbItems={[{ title: "Lỗi" }]}>
-        <Result
-          status="error"
-          title="ID không hợp lệ"
-          subTitle="Quay lại danh sách để chọn cấu hình."
-          extra={
-            <Button type="primary" onClick={() => router.push("/crawler/config")}>
-              Về danh sách
-            </Button>
-          }
-        />
-      </AdminLayout>
+      <Result
+        status="error"
+        title="ID không hợp lệ"
+        subTitle="Quay lại danh sách để chọn cấu hình."
+        extra={
+          <Button type="primary" onClick={() => router.push("/crawler/config")}>
+            Về danh sách
+          </Button>
+        }
+      />
     );
   }
 
   return (
-    <AdminLayout
-      breadcrumbItems={[
-        { title: <Link href="/crawler/config">Cấu hình crawler</Link> },
-        { title: detail?.name ?? `#${id}` },
-      ]}
-    >
+    <>
       <Flex vertical gap="large" style={{ width: "100%" }}>
         <Flex align="center" justify="space-between" gap={16} wrap>
           <Flex align="center" gap={12} wrap>
@@ -610,20 +738,27 @@ export default function CrawlerConfigDetailPage() {
         width={720}
         destroyOnHidden
         centered
+        styles={{ body: { paddingTop: 8 } }}
       >
         <Form
           form={stepForm}
           layout="vertical"
           requiredMark={false}
           scrollToFirstError
-          style={{ marginTop: 8 }}
+          style={{ marginTop: 4 }}
         >
-          <Card
-            size="small"
-            title="Thông tin chính"
-            styles={{ body: { paddingBottom: 8 } }}
-            style={{ marginBottom: 12 }}
+          <div
+            style={{
+              border: "1px solid var(--ant-colorBorderSecondary)",
+              borderRadius: 10,
+              padding: "12px 14px 4px",
+              marginBottom: 12,
+              background: "var(--ant-colorFillQuaternary)",
+            }}
           >
+            <Text strong style={{ display: "block", marginBottom: 10 }}>
+              Thông tin chính
+            </Text>
             <Row gutter={[16, 8]}>
               <Col xs={24} sm={8}>
                 <Form.Item name="stepOrder" label="Thứ tự" rules={[{ required: true }]}>
@@ -643,8 +778,8 @@ export default function CrawlerConfigDetailPage() {
                     showSearch
                     optionFilterProp="label"
                     options={STEP_TYPE_OPTIONS.map((o) => ({
-                      label: o.label.toUpperCase(),
                       value: o.value,
+                      label: o.label.toUpperCase(),
                     }))}
                   />
                 </Form.Item>
@@ -660,39 +795,27 @@ export default function CrawlerConfigDetailPage() {
                 </Form.Item>
               </Col>
             </Row>
-          </Card>
+          </div>
 
-          <Card
-            size="small"
-            title="Locator"
-            extra={<Text type="secondary">Dùng cho navigate/interact/extract</Text>}
-            styles={{ body: { paddingBottom: 8 } }}
-            style={{ marginBottom: 12 }}
+          <div
+            style={{
+              border: "1px solid var(--ant-colorBorderSecondary)",
+              borderRadius: 10,
+              padding: "12px 14px 4px",
+              background: "var(--ant-colorBgContainer)",
+            }}
           >
-            <Row gutter={[16, 8]}>
-              <Col xs={24} md={8}>
-                <Form.Item name="locatorType" label="Loại locator">
-                  <Select
-                    allowClear
-                    options={LOCATOR_TYPES.map((t) => ({ label: t, value: t }))}
-                  />
-                </Form.Item>
-              </Col>
-              <Col xs={24} md={16}>
-                <Form.Item name="locatorValue" label="Giá trị locator">
-                  <Input.TextArea rows={2} placeholder="CSS / XPath / JSON path…" />
-                </Form.Item>
-              </Col>
-            </Row>
-          </Card>
-
-          <Card
-            size="small"
-            title="Nâng cao"
-            styles={{ body: { paddingBottom: 8 } }}
-          >
+            <Text strong style={{ display: "block", marginBottom: 10 }}>
+              Nâng cao
+            </Text>
             <Form.Item name="outputUrlType" label="Kiểu URL đầu ra">
-              <Input allowClear placeholder="relative, absolute…" />
+              <Select
+                allowClear
+                options={OUTPUT_URL_TYPE_OPTIONS.map((o) => ({
+                  value: o.value,
+                  label: `${o.label} — ${o.hint}`,
+                }))}
+              />
             </Form.Item>
             <Form.Item name="customScriptId" label="Script tùy chỉnh">
               <Select
@@ -706,17 +829,90 @@ export default function CrawlerConfigDetailPage() {
                 }))}
               />
             </Form.Item>
-            <Form.Item name="extraConfigText" label="Cấu hình nâng cao (JSON)">
-              <Input.TextArea rows={5} placeholder='{"headers":{}}' />
+            {/* ── Browser Config (NAVIGATE / INTERACT / PYTHON_CRAWL) ─────────── */}
+            {["navigate", "interact"].includes(watchedStepType) && (
+              <>
+                <Divider orientation="left" plain style={{ marginTop: 4, marginBottom: 12 }}>
+                  Trình duyệt
+                </Divider>
+                <Row gutter={[16, 8]}>
+                  <Col xs={24} sm={8}>
+                    <Form.Item name="browser" label="Browser engine" initialValue="selenium">
+                      <Select
+                        options={[
+                          { value: "selenium", label: "Selenium (mặc định)" },
+                          { value: "multilogin", label: "Multilogin (chống bot)" },
+                          { value: "local_chrome", label: "Local Chrome (Chrome đang mở)" },
+                        ]}
+                      />
+                    </Form.Item>
+                  </Col>
+                  {watchedBrowser === "multilogin" && (
+                    <>
+                      <Col xs={24} sm={8}>
+                        <Form.Item
+                          name="multiloginFolderId"
+                          label="Multilogin Folder ID"
+                          rules={[{ required: true, message: "Nhập Folder ID" }]}
+                        >
+                          <Input placeholder="xxxxxxxx-xxxx-xxxx-xxxx-xxxxxxxxxxxx" />
+                        </Form.Item>
+                      </Col>
+                      <Col xs={24} sm={8}>
+                        <Form.Item
+                          name="multiloginProfileId"
+                          label="Multilogin Profile ID"
+                          rules={[{ required: true, message: "Nhập Profile ID" }]}
+                        >
+                          <Input placeholder="yyyyyyyy-yyyy-yyyy-yyyy-yyyyyyyyyyyy" />
+                        </Form.Item>
+                      </Col>
+                    </>
+                  )}
+                </Row>
+              </>
+            )}
+
+            {/* ── Login Config (NAVIGATE / INTERACT / PYTHON_CRAWL) ────────── */}
+            {["navigate", "interact", "python_crawl"].includes(watchedStepType) && (
+              <>
+                <Divider orientation="left" plain style={{ marginTop: 4, marginBottom: 12 }}>
+                  Login (tuỳ chọn)
+                </Divider>
+                <Row gutter={[16, 8]}>
+                  <Col xs={24} sm={24}>
+                    <Form.Item name="loginUrl" label="Login URL">
+                      <Input placeholder="https://example.com/login" allowClear />
+                    </Form.Item>
+                  </Col>
+                  <Col xs={24} sm={12}>
+                    <Form.Item name="loginEmail" label="Email / Tài khoản">
+                      <Input placeholder="user@example.com" allowClear />
+                    </Form.Item>
+                  </Col>
+                  <Col xs={24} sm={12}>
+                    <Form.Item name="loginPassword" label="Mật khẩu">
+                      <Input.Password placeholder="••••••••" />
+                    </Form.Item>
+                  </Col>
+                </Row>
+              </>
+            )}
+
+            <Divider orientation="left" plain style={{ marginTop: 4, marginBottom: 12 }}>
+              Cấu hình khác (JSON)
+            </Divider>
+            <Form.Item name="extraConfigText" label={null}>
+              <Input.TextArea rows={4} placeholder='{"scroll_times": 10, "scroll_wait_ms": 2000}' />
             </Form.Item>
-          </Card>
+          </div>
         </Form>
       </Modal>
 
       <Drawer
         title={
-          fieldsDrawerStep
-            ? `Danh sách field — ${fieldsDrawerStep.stepName ?? "bước"} (#${fieldsDrawerStep.stepOrder})`
+          liveFieldsStep
+            ? `Danh sách field — ${liveFieldsStep.stepName ?? "bước"} (#${liveFieldsStep.stepOrder})`
             : "Field"
         }
         width={720}
@@ -731,7 +927,7 @@ export default function CrawlerConfigDetailPage() {
           <Button
             type="primary"
             icon={<PlusOutlined />}
-            disabled={!fieldsDrawerStep?.id}
+            disabled={!liveFieldsStep?.id}
             onClick={openAddField}
           >
             Thêm trường
@@ -739,7 +935,7 @@ export default function CrawlerConfigDetailPage() {
         }
         styles={{ body: { paddingBottom: 24 } }}
       >
-        {!fieldsDrawerStep?.id && (
+        {!liveFieldsStep?.id && (
           <Alert
             type="warning"
             showIcon
@@ -752,7 +948,7 @@ export default function CrawlerConfigDetailPage() {
           size="small"
           bordered
           pagination={false}
-          dataSource={fieldsDrawerStep?.crawlerFields ?? []}
+          dataSource={liveFieldsStep?.crawlerFields ?? []}
           locale={{
             emptyText: (
               <Empty
@@ -816,10 +1012,10 @@ export default function CrawlerConfigDetailPage() {
       </Drawer>
 
       <FieldFormModal
-        open={fieldModalOpen && !!fieldsDrawerStep?.id}
+        open={fieldModalOpen && !!liveFieldsStep?.id}
         title={editingField?.id ? "Sửa field" : "Thêm trường"}
         confirmLoading={addingField || updatingField}
-        crawlerStepId={fieldsDrawerStep?.id ?? 0}
+        crawlerStepId={liveFieldsStep?.id ?? 0}
         initial={editingField}
         onCancel={() => {
           setFieldModalOpen(false);
@@ -827,6 +1023,130 @@ export default function CrawlerConfigDetailPage() {
         }}
         onSubmit={saveField}
       />
-    </AdminLayout>
+
+      {/* ─── Locators Drawer ──────────────────────────────────────── */}
+      <Drawer
+        title={
+          liveLocatorsStep
+            ? `Locators — ${liveLocatorsStep.stepName ?? "bước"} (#${liveLocatorsStep.stepOrder})`
+            : "Locators"
+        }
+        width={680}
+        open={!!locatorsDrawerStep}
+        destroyOnHidden
+        onClose={() => {
+          setLocatorsDrawerStep(null);
+          setEditingLocator(null);
+          setLocatorModalOpen(false);
+        }}
+        extra={
+          <Button
+            type="primary"
+            icon={<PlusOutlined />}
+            disabled={!liveLocatorsStep?.id}
+            onClick={openAddLocator}
+          >
+            Thêm locator
+          </Button>
+        }
+        styles={{ body: { paddingBottom: 24 } }}
+      >
+        {!liveLocatorsStep?.id && (
+          <Alert
+            type="warning"
+            showIcon
+            style={{ marginBottom: 16 }}
+            message="Lưu bước trước khi thêm locator."
+          />
+        )}
+        <Table<CrawlerStepLocatorRow>
+          rowKey={(r) => String(r.id ?? r.locatorOrder)}
+          size="small"
+          bordered
+          pagination={false}
+          dataSource={liveLocatorsStep?.locators ?? []}
+          locale={{
+            emptyText: (
+              <Empty
+                image={Empty.PRESENTED_IMAGE_SIMPLE}
+                description="Chưa có locator cho bước này"
+              />
+            ),
+          }}
+          columns={[
+            { title: "TT", dataIndex: "locatorOrder", width: 50, align: "center" },
+            {
+              title: "Loại",
+              dataIndex: "locatorType",
+              width: 90,
+              render: (t: string) => <Tag>{t}</Tag>,
+            },
+            {
+              title: "Giá trị",
+              dataIndex: "locatorValue",
+              ellipsis: true,
+              render: (t: string) => (
+                <Text code style={{ fontSize: 12 }}>
+                  {t}
+                </Text>
+              ),
+            },
+            {
+              title: "target_step",
+              dataIndex: "targetStep",
+              width: 90,
+              render: (t: string) => t || "next",
+            },
+            {
+              title: "filter_regex",
+              dataIndex: "filterRegex",
+              width: 120,
+              ellipsis: true,
+              render: (t: string) => t || "—",
+            },
+            {
+              title: "Thao tác",
+              width: 90,
+              align: "center",
+              fixed: "right",
+              render: (_, loc) => (
+                <Flex gap={4} justify="center">
+                  <Tooltip title="Sửa locator">
+                    <Button
+                      type="text"
+                      size="small"
+                      icon={<EditOutlined />}
+                      onClick={() => openEditLocator(loc)}
+                    />
+                  </Tooltip>
+                  <Tooltip title="Xóa locator">
+                    <Button
+                      type="text"
+                      size="small"
+                      danger
+                      icon={<DeleteOutlined />}
+                      onClick={() => removeLocator(loc)}
+                    />
+                  </Tooltip>
+                </Flex>
+              ),
+            },
+          ]}
+        />
+      </Drawer>
+
+      <LocatorFormModal
+        open={locatorModalOpen && !!liveLocatorsStep?.id}
+        title={editingLocator?.id ? "Sửa locator" : "Thêm locator"}
+        confirmLoading={addingLocator || updatingLocator}
+        crawlerStepId={liveLocatorsStep?.id ?? 0}
+        initial={editingLocator}
+        onCancel={() => {
+          setLocatorModalOpen(false);
+          setEditingLocator(null);
+        }}
+        onSubmit={saveLocator}
+      />
+    </>
   );
 }

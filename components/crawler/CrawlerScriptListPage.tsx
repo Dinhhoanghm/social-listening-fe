@@ -25,7 +25,6 @@ import {
 } from "@ant-design/icons";
 import Link from "next/link";
 import { useEffect, useMemo, useState } from "react";
-import AdminLayout from "@/components/admin/AdminLayout";
 import {
   useAddCustomScriptMutation,
   useDeleteCustomScriptMutation,
@@ -200,12 +199,7 @@ export default function CrawlerScriptListPage() {
     adding || updating || (editingId != null && detailLoading);
 
   return (
-    <AdminLayout
-      breadcrumbItems={[
-        { title: <Link href="/crawler/config">Cấu hình crawler</Link> },
-        { title: "Script tùy chỉnh" },
-      ]}
-    >
+    <>
       <Card
         title="Script tùy chỉnh"
         extra={
@@ -329,6 +323,6 @@ export default function CrawlerScriptListPage() {
           </Form>
         )}
       </Modal>
-    </AdminLayout>
+    </>
   );
 }

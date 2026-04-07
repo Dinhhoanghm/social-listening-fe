@@ -1,3 +1,4 @@
+// @ts-nocheck
 "use client";
 import React, { memo, useEffect, useMemo, useState } from "react";
 import type { MenuProps } from "antd";

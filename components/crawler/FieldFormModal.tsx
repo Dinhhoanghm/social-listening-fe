@@ -110,7 +110,7 @@ export default function FieldFormModal({
                 optionFilterProp="label"
                 options={FIELD_TYPE_OPTIONS.map((o) => ({
                   value: o.value,
-                  label: o.label,
+                  label: `${o.label} — ${o.hint}`,
                 }))}
               />
             </Form.Item>

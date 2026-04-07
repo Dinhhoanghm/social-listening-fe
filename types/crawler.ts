@@ -74,6 +74,27 @@ export interface CrawlerCustomScriptRow {
   language?: string;
   script?: string;
   description?: string;
+  version?: number;
+}
+
+export interface CrawlerStepLocatorRow {
+  id?: number;
+  crawlerStepId?: number;
+  locatorOrder?: number;
+  locatorType?: string;
+  locatorValue?: string;
+  targetStep?: string;
+  filterRegex?: string;
+  createdAt?: string;
+}
+
+export interface CrawlerStepLocatorRequestBody {
+  crawlerStepId: number;
+  locatorOrder?: number;
+  locatorType: string;
+  locatorValue: string;
+  targetStep?: string;
+  filterRegex?: string;
 }
 
 export interface CrawlerFieldRow {
@@ -95,14 +116,13 @@ export interface CrawlerStepModel {
   stepName?: string;
   stepType?: string;
   requestMethod?: string;
-  locatorType?: string;
-  locatorValue?: string;
   outputUrlType?: string;
   delaySeconds?: number;
   customScriptId?: number | null;
   customScript?: CrawlerCustomScriptRow | null;
   extraConfig?: unknown;
   createdAt?: string;
+  locators?: CrawlerStepLocatorRow[];
   crawlerFields?: CrawlerFieldRow[];
 }
 
@@ -116,8 +136,6 @@ export interface CrawlerStepRequestBody {
   stepName: string;
   stepType: string;
   requestMethod?: string;
-  locatorType?: string;
-  locatorValue?: string;
   outputUrlType?: string;
   delaySeconds?: number;
   customScriptId?: number | null;

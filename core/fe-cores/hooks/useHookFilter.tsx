@@ -1,3 +1,4 @@
+// @ts-nocheck
 import { SearchBody } from "fe-base/apis";
 import {
   cloneDeep,

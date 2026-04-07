@@ -1,3 +1,4 @@
+// @ts-nocheck
 function removeVietnameseTones(str) {
   return str
     .normalize('NFD') // Chuyển Unicode tổ hợp

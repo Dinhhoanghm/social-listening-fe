@@ -9,6 +9,8 @@ import type {
   CrawlerFieldRow,
   CrawlerSourceRequestBody,
   CrawlerSourceRow,
+  CrawlerStepLocatorRequestBody,
+  CrawlerStepLocatorRow,
   CrawlerStepModel,
   CrawlerStepRequestBody,
 } from "@/types/crawler";
@@ -306,6 +308,52 @@ export const crawlerApi = baseApi.injectEndpoints({
       transformResponse: transformDfResponse,
       invalidatesTags: ["CustomScript"],
     }),
+
+    addCrawlerStepLocator: builder.mutation<
+      CrawlerStepLocatorRow,
+      { body: CrawlerStepLocatorRequestBody; crawlerConfigId: number }
+    >({
+      query: ({ body }) => ({
+        url: "/api/v1/crawler-step-locators/add",
+        method: "POST",
+        body,
+      }),
+      transformResponse: transformDfResponse,
+      invalidatesTags: (r, e, { crawlerConfigId }) => [
+        { type: "CrawlerConfig", id: crawlerConfigId },
+      ],
+    }),
+
+    updateCrawlerStepLocator: builder.mutation<
+      CrawlerStepLocatorRow,
+      { id: number; body: CrawlerStepLocatorRequestBody; crawlerConfigId: number }
+    >({
+      query: ({ id, body }) => ({
+        url: "/api/v1/crawler-step-locators/update",
+        method: "PUT",
+        params: { id },
+        body,
+      }),
+      transformResponse: transformDfResponse,
+      invalidatesTags: (r, e, { crawlerConfigId }) => [
+        { type: "CrawlerConfig", id: crawlerConfigId },
+      ],
+    }),
+
+    deleteCrawlerStepLocator: builder.mutation<
+      string,
+      { id: number; crawlerConfigId: number }
+    >({
+      query: ({ id }) => ({
+        url: "/api/v1/crawler-step-locators/delete",
+        method: "DELETE",
+        params: { id },
+      }),
+      transformResponse: transformDfResponse,
+      invalidatesTags: (r, e, { crawlerConfigId }) => [
+        { type: "CrawlerConfig", id: crawlerConfigId },
+      ],
+    }),
   }),
   overrideExisting: true,
 });
@@ -332,4 +380,7 @@ export const {
   useAddCustomScriptMutation,
   useUpdateCustomScriptMutation,
   useDeleteCustomScriptMutation,
+  useAddCrawlerStepLocatorMutation,
+  useUpdateCrawlerStepLocatorMutation,
+  useDeleteCrawlerStepLocatorMutation,
 } = crawlerApi;

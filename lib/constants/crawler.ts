@@ -1,47 +1,155 @@
-/**
- * Aligns with crawler core pipeline (CrawlerType / StepType).
- * Backend may expect lowercase `crawler_type` values — adjust if your API differs.
- */
+// ─── CrawlTypeEnum ───────────────────────────────────────────────────────────
 export const CRAWLER_TYPE_OPTIONS = [
   {
     value: "http",
     label: "HTTP / Web",
-    hint: "Tin, forum, trang tĩnh hoặc động",
+    hint: "Trang tĩnh, SPA, RSS, forum — phân biệt static/dynamic qua loại bước",
   },
-  { value: "api", label: "API", hint: "REST, JSON có cấu trúc" },
-  { value: "android", label: "Android", hint: "App mạng xã hội (Android)" },
-  { value: "ios", label: "iOS", hint: "App mạng xã hội (iOS)" },
+  {
+    value: "api",
+    label: "API",
+    hint: "REST hoặc GraphQL, response JSON/XML có cấu trúc",
+  },
+  {
+    value: "android",
+    label: "Android",
+    hint: "Tự động hóa app Android qua UIAutomator2 hoặc mitmproxy",
+  },
+  {
+    value: "ios",
+    label: "iOS",
+    hint: "Tự động hóa app iOS qua XCUITest",
+  },
   {
     value: "document",
     label: "Document",
-    hint: "PDF, DOCX — Apache Tika",
+    hint: "File nhị phân cần parse: PDF, DOCX, XLSX — Apache Tika",
   },
 ] as const;
 
-export const PARSE_TYPES = ["HTML", "JSON", "XML", "RSS"] as const;
-
-export const REQUEST_METHODS = ["GET", "POST"] as const;
-
-export const LOCATOR_TYPES = [
-  "css",
-  "xpath",
-  "regex",
-  "id",
-  "name",
-  "json_path",
+// ─── CrawlStepEnum ───────────────────────────────────────────────────────────
+export const STEP_TYPE_OPTIONS = [
+  {
+    value: "fetch",
+    label: "Fetch",
+    hint: "HTTP GET/POST — web tĩnh, RSS, API không cần JS",
+  },
+  {
+    value: "navigate",
+    label: "Navigate",
+    hint: "Mở browser có JS (Playwright) — SPA, trang cần render trước khi đọc DOM",
+  },
+  {
+    value: "interact",
+    label: "Interact",
+    hint: "Thao tác browser/app: scroll, click, input, wait",
+  },
+  {
+    value: "extract",
+    label: "Extract",
+    hint: "Đọc DOM/XML/JSON → lấy data theo crawler_field",
+  },
+  {
+    value: "discover",
+    label: "Discover",
+    hint: "Đọc DOM/XML/JSON → sinh URL mới đưa vào task queue",
+  },
+  {
+    value: "filter",
+    label: "Filter",
+    hint: "Lọc và dedup URL trước khi enqueue — kiểm tra url_hash, pattern",
+  },
+  {
+    value: "transform",
+    label: "Transform",
+    hint: "Clean/normalize data đã có, không thực hiện thêm request",
+  },
+  {
+    value: "download",
+    label: "Download",
+    hint: "Tải file nhị phân về disk: ảnh, video, PDF, DOCX",
+  },
+  {
+    value: "script",
+    label: "Script",
+    hint: "Chạy Python/JS script tùy biến từ crawler_custom_script",
+  },
+  {
+    value: "python_crawl",
+    label: "Python Crawl",
+    hint: "SeleniumBase UC mode — vượt bot-detection (DataDome, Cloudflare, NYT). Hỗ trợ login flow + scroll qua extra_config",
+  },
 ] as const;
 
-/** Khớp `FieldType` backend (giá trị chữ thường). */
+// ─── LocatorType ──────────────────────────────────────────────────────────────
+export const LOCATOR_TYPE_OPTIONS = [
+  {
+    value: "css",
+    label: "CSS",
+    hint: "CSS selector — HTML DOM. Ví dụ: .product-name, meta[property='og:image']",
+  },
+  {
+    value: "xpath",
+    label: "XPath",
+    hint: "XPath expression — XML hoặc Android UI hierarchy. Ví dụ: //item/link",
+  },
+  {
+    value: "json_path",
+    label: "JSONPath",
+    hint: "JSONPath expression — API response hoặc XHR intercept. Ví dụ: $.list[*].title",
+  },
+  {
+    value: "regex",
+    label: "Regex",
+    hint: "Regular expression — validate hoặc filter URL trong bước FILTER",
+  },
+  {
+    value: "js_eval",
+    label: "JS Eval",
+    hint: "JavaScript expression chạy trong browser context (Playwright evaluate)",
+  },
+  {
+    value: "package",
+    label: "Package",
+    hint: "Android app package name để launch qua ADB. Ví dụ: com.zhiliaoapp.musically",
+  },
+] as const;
+
+// ─── OutputUrlEnum ────────────────────────────────────────────────────────────
+export const OUTPUT_URL_TYPE_OPTIONS = [
+  {
+    value: "none",
+    label: "None",
+    hint: "Không sinh URL mới — dùng cho EXTRACT, TRANSFORM",
+  },
+  {
+    value: "page",
+    label: "Page",
+    hint: "URL trang/endpoint cần fetch tiếp trong pipeline",
+  },
+  {
+    value: "media",
+    label: "Media",
+    hint: "URL file nhị phân cần download: ảnh, video, PDF, DOCX",
+  },
+  {
+    value: "feed",
+    label: "Feed",
+    hint: "URL trả về danh sách URL khác: RSS, sitemap, API list endpoint",
+  },
+] as const;
+
+// ─── FieldType ────────────────────────────────────────────────────────────────
 export const FIELD_TYPE_OPTIONS = [
-  { value: "text", label: "text" },
-  { value: "number", label: "number" },
-  { value: "datetime", label: "datetime" },
-  { value: "url", label: "url" },
-  { value: "list", label: "list" },
-  { value: "json", label: "json" },
+  { value: "text", label: "Text", hint: "Chuỗi văn bản thuần — tiêu đề, tên tác giả" },
+  { value: "number", label: "Number", hint: "Số nguyên hoặc số thực" },
+  { value: "datetime", label: "DateTime", hint: "Ngày giờ ISO 8601 — kết hợp to_datetime" },
+  { value: "url", label: "URL", hint: "Địa chỉ URL đã normalize — kết hợp to_url" },
+  { value: "list", label: "List", hint: "Mảng nhiều giá trị cùng loại — tag, ảnh, hashtag" },
+  { value: "json", label: "JSON", hint: "Object phức tạp lưu dạng JSON — bảng thông số" },
 ] as const;
 
-/** Khớp `TransformRule` backend — chuỗi có thể nối bằng dấu phẩy trong một field. */
+// ─── TransformRule (không có enum riêng, dựa theo tài liệu backend) ───────────
 export const TRANSFORM_RULE_OPTIONS = [
   { value: "strip", label: "strip" },
   { value: "normalize", label: "normalize" },
@@ -57,13 +165,6 @@ export const TRANSFORM_RULE_OPTIONS = [
   { value: "first", label: "first" },
 ] as const;
 
-/** Khớp `StepType` backend — giá trị API là chữ thường. */
-export const STEP_TYPE_OPTIONS = [
-  { value: "fetch", label: "fetch" },
-  { value: "navigate", label: "navigate" },
-  { value: "interact", label: "interact" },
-  { value: "extract", label: "extract" },
-  { value: "filter", label: "filter" },
-  { value: "transform", label: "transform" },
-  { value: "script", label: "script" },
-] as const;
+export const PARSE_TYPES = ["HTML", "JSON", "XML", "RSS"] as const;
+
+export const REQUEST_METHODS = ["GET", "POST"] as const;

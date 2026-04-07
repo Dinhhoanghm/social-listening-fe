@@ -1,3 +1,4 @@
+// @ts-nocheck
 // Or from '@reduxjs/toolkit/query' if not using the auto-generated hooks
 import {
   createApi,

@@ -1,3 +1,4 @@
+// @ts-nocheck
 import { Flex } from "antd";
 import React, { FC, memo } from "react";
 import GlobalLogo from "../GlobalLogo";

@@ -22,7 +22,6 @@ import {
 } from "@ant-design/icons";
 import Link from "next/link";
 import { useMemo, useState } from "react";
-import AdminLayout from "@/components/admin/AdminLayout";
 import {
   useAddCrawlerSourceMutation,
   useDeleteCrawlerSourceMutation,
@@ -199,12 +198,7 @@ export default function CrawlerSourceListPage() {
   ];
 
   return (
-    <AdminLayout
-      breadcrumbItems={[
-        { title: <Link href="/crawler/config">Cấu hình crawler</Link> },
-        { title: "Nguồn dữ liệu" },
-      ]}
-    >
+    <>
       <Card
         title="Nguồn dữ liệu"
         extra={
@@ -320,6 +314,6 @@ export default function CrawlerSourceListPage() {
           </Form.Item>
         </Form>
       </Modal>
-    </AdminLayout>
+    </>
   );
 }
