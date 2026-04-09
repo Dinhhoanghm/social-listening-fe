@@ -109,9 +109,39 @@ export interface CrawlerFieldRow {
   createdAt?: string;
 }
 
+export interface CrawlerStepActionRow {
+  id?: number;
+  crawlerStepId?: number;
+  actionOrder?: number;
+  actionType?: string;
+  locatorType?: string;
+  locatorValue?: string;
+  selectorScript?: string;
+  times?: number;
+  delayMs?: number;
+  waitMs?: number;
+  value?: string;
+  createdAt?: string;
+}
+
+export interface CrawlerStepActionRequestBody {
+  crawlerStepId: number;
+  actionOrder?: number;
+  actionType: string;
+  locatorType?: string;
+  locatorValue?: string;
+  selectorScript?: string;
+  times?: number;
+  delayMs?: number;
+  waitMs?: number;
+  value?: string;
+}
+
 export interface CrawlerStepModel {
   id?: number;
   crawlerConfigId?: number;
+  isDynamic?: boolean;
+  filterRegex?: string;
   stepOrder?: number;
   stepName?: string;
   stepType?: string;
@@ -124,6 +154,7 @@ export interface CrawlerStepModel {
   createdAt?: string;
   locators?: CrawlerStepLocatorRow[];
   crawlerFields?: CrawlerFieldRow[];
+  actions?: CrawlerStepActionRow[];
 }
 
 export interface CrawlerConfigDetail extends CrawlerConfigRow {
@@ -132,6 +163,8 @@ export interface CrawlerConfigDetail extends CrawlerConfigRow {
 
 export interface CrawlerStepRequestBody {
   crawlerConfigId: number;
+  isDynamic?: boolean;
+  filterRegex?: string;
   stepOrder: number;
   stepName: string;
   stepType: string;

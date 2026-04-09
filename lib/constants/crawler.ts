@@ -32,12 +32,7 @@ export const STEP_TYPE_OPTIONS = [
   {
     value: "fetch",
     label: "Fetch",
-    hint: "HTTP GET/POST — web tĩnh, RSS, API không cần JS",
-  },
-  {
-    value: "navigate",
-    label: "Navigate",
-    hint: "Mở browser có JS (Playwright) — SPA, trang cần render trước khi đọc DOM",
+    hint: "HTTP GET/POST thông tin trang web",
   },
   {
     value: "interact",
@@ -55,11 +50,6 @@ export const STEP_TYPE_OPTIONS = [
     hint: "Đọc DOM/XML/JSON → sinh URL mới đưa vào task queue",
   },
   {
-    value: "filter",
-    label: "Filter",
-    hint: "Lọc và dedup URL trước khi enqueue — kiểm tra url_hash, pattern",
-  },
-  {
     value: "transform",
     label: "Transform",
     hint: "Clean/normalize data đã có, không thực hiện thêm request",
@@ -73,11 +63,6 @@ export const STEP_TYPE_OPTIONS = [
     value: "script",
     label: "Script",
     hint: "Chạy Python/JS script tùy biến từ crawler_custom_script",
-  },
-  {
-    value: "python_crawl",
-    label: "Python Crawl",
-    hint: "SeleniumBase UC mode — vượt bot-detection (DataDome, Cloudflare, NYT). Hỗ trợ login flow + scroll qua extra_config",
   },
 ] as const;
 
@@ -141,12 +126,32 @@ export const OUTPUT_URL_TYPE_OPTIONS = [
 
 // ─── FieldType ────────────────────────────────────────────────────────────────
 export const FIELD_TYPE_OPTIONS = [
-  { value: "text", label: "Text", hint: "Chuỗi văn bản thuần — tiêu đề, tên tác giả" },
+  {
+    value: "text",
+    label: "Text",
+    hint: "Chuỗi văn bản thuần — tiêu đề, tên tác giả",
+  },
   { value: "number", label: "Number", hint: "Số nguyên hoặc số thực" },
-  { value: "datetime", label: "DateTime", hint: "Ngày giờ ISO 8601 — kết hợp to_datetime" },
-  { value: "url", label: "URL", hint: "Địa chỉ URL đã normalize — kết hợp to_url" },
-  { value: "list", label: "List", hint: "Mảng nhiều giá trị cùng loại — tag, ảnh, hashtag" },
-  { value: "json", label: "JSON", hint: "Object phức tạp lưu dạng JSON — bảng thông số" },
+  {
+    value: "datetime",
+    label: "DateTime",
+    hint: "Ngày giờ ISO 8601 — kết hợp to_datetime",
+  },
+  {
+    value: "url",
+    label: "URL",
+    hint: "Địa chỉ URL đã normalize — kết hợp to_url",
+  },
+  {
+    value: "list",
+    label: "List",
+    hint: "Mảng nhiều giá trị cùng loại — tag, ảnh, hashtag",
+  },
+  {
+    value: "json",
+    label: "JSON",
+    hint: "Object phức tạp lưu dạng JSON — bảng thông số",
+  },
 ] as const;
 
 // ─── TransformRule (không có enum riêng, dựa theo tài liệu backend) ───────────
@@ -165,6 +170,29 @@ export const TRANSFORM_RULE_OPTIONS = [
   { value: "first", label: "first" },
 ] as const;
 
+// ─── ActionType (dùng cho INTERACT step) ─────────────────────────────────────
+export const ACTION_TYPE_OPTIONS = [
+  { value: "scroll",       label: "scroll",       hint: "Cuộn trang xuống cuối N lần" },
+  { value: "click",        label: "click",        hint: "Click 1 phần tử" },
+  { value: "click_all",    label: "click_all",    hint: "Click tất cả phần tử khớp selector (vd: nhiều nút Xem thêm)" },
+  { value: "repeat_click", label: "repeat_click", hint: "Click lặp 1 nút cho đến khi biến mất (vd: Xem thêm bình luận)" },
+  { value: "input",        label: "input",        hint: "Nhập văn bản vào ô input" },
+  { value: "wait",         label: "wait",         hint: "Chờ delay_ms mili giây" },
+] as const;
+
+// ─── Browser locator type (css/xpath only — dùng trong ActionFormModal) ──────
+export const BROWSER_LOCATOR_TYPE_OPTIONS = [
+  { value: "css",   label: "CSS",   hint: "CSS selector — ví dụ: div[role='button']" },
+  { value: "xpath", label: "XPath", hint: "XPath — ví dụ: //button[contains(.,'Xem thêm')]" },
+  { value: "id",    label: "ID",    hint: "Attribute id của element" },
+  { value: "name",  label: "name",  hint: "Attribute name của element" },
+] as const;
+
 export const PARSE_TYPES = ["HTML", "JSON", "XML", "RSS"] as const;
 
 export const REQUEST_METHODS = ["GET", "POST"] as const;
+
+export const WEB_TYPE_OPTIONS = [
+  { value: true, label: "Dynamic", hint: "Thay đổi theo dữ liệu" },
+  { value: false, label: "Static", hint: "Cố định" },
+];

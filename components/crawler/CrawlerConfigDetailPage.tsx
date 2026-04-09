@@ -1,53 +1,28 @@
 "use client";
 
-import {
-  Alert,
-  App,
-  Button,
-  Card,
-  Col,
-  Divider,
-  Drawer,
-  Empty,
-  Flex,
-  Form,
-  Input,
-  InputNumber,
-  Modal,
-  Result,
-  Row,
-  Select,
-  Switch,
-  Table,
-  Tag,
-  Tooltip,
-  Typography,
-} from "antd";
-import type { ColumnsType } from "antd/es/table";
-import {
-  ArrowLeftOutlined,
-  DeleteOutlined,
-  EditOutlined,
-  PlusOutlined,
-} from "@ant-design/icons";
+import { App, Button, Flex, Form, Result } from "antd";
 import { useParams, useRouter } from "next/navigation";
 import { useEffect, useMemo, useState } from "react";
-import {
-  CRAWLER_TYPE_OPTIONS,
-  OUTPUT_URL_TYPE_OPTIONS,
-  PARSE_TYPES,
-  REQUEST_METHODS,
-  STEP_TYPE_OPTIONS,
-} from "@/lib/constants/crawler";
+import CrawlerConfigDetailHeader from "./CrawlerConfigDetailHeader";
+import CrawlerConfigInfoFormCard from "./CrawlerConfigInfoFormCard";
+import CrawlerPipelineCard from "./CrawlerPipelineCard";
+import CrawlerStepConfig from "./CrawlerStepConfig";
+import CrawlerStepFieldsDrawer from "./CrawlerStepFieldsDrawer";
+import CrawlerStepLocatorsDrawer from "./CrawlerStepLocatorsDrawer";
+import CrawlerStepActionsDrawer from "./CrawlerStepActionsDrawer";
 import FieldFormModal from "./FieldFormModal";
 import LocatorFormModal from "./LocatorFormModal";
+import ActionFormModal from "./ActionFormModal";
+import CreateCrawlerStepColumns from "./CrawlerStepColumns";
 import {
   useAddCrawlerFieldMutation,
   useAddCrawlerStepMutation,
   useAddCrawlerStepLocatorMutation,
+  useAddCrawlerStepActionMutation,
   useDeleteCrawlerFieldMutation,
   useDeleteCrawlerStepMutation,
   useDeleteCrawlerStepLocatorMutation,
+  useDeleteCrawlerStepActionMutation,
   useGetCrawlerConfigDetailQuery,
   useSearchCrawlerSourcesQuery,
   useSearchCustomScriptsQuery,
@@ -55,24 +30,22 @@ import {
   useUpdateCrawlerFieldMutation,
   useUpdateCrawlerStepMutation,
   useUpdateCrawlerStepLocatorMutation,
+  useUpdateCrawlerStepActionMutation,
 } from "@/lib/store/apis/crawlerApi";
-import {
-  mergeParametersJson,
-  parseParametersJson,
-} from "@/lib/parameters";
+import { mergeParametersJson, parseParametersJson } from "@/lib/parameters";
 import type {
   CrawlerConfigRequestBody,
   CrawlerCustomScriptRow,
   CrawlerFieldRequestBody,
   CrawlerFieldRow,
   CrawlerParametersPayload,
+  CrawlerStepActionRequestBody,
+  CrawlerStepActionRow,
   CrawlerStepLocatorRequestBody,
   CrawlerStepLocatorRow,
   CrawlerStepModel,
   CrawlerStepRequestBody,
 } from "@/types/crawler";
-
-const { Title, Text } = Typography;
 
 export default function CrawlerConfigDetailPage() {
   const { message, modal } = App.useApp();
@@ -89,13 +62,21 @@ export default function CrawlerConfigDetailPage() {
   const [fieldsDrawerStep, setFieldsDrawerStep] =
     useState<CrawlerStepModel | null>(null);
   const [fieldModalOpen, setFieldModalOpen] = useState(false);
-  const [editingField, setEditingField] = useState<CrawlerFieldRow | null>(null);
+  const [editingField, setEditingField] = useState<CrawlerFieldRow | null>(
+    null,
+  );
 
   const [locatorsDrawerStep, setLocatorsDrawerStep] =
     useState<CrawlerStepModel | null>(null);
   const [locatorModalOpen, setLocatorModalOpen] = useState(false);
   const [editingLocator, setEditingLocator] =
     useState<CrawlerStepLocatorRow | null>(null);
+
+  const [actionsDrawerStep, setActionsDrawerStep] =
+    useState<CrawlerStepModel | null>(null);
+  const [actionModalOpen, setActionModalOpen] = useState(false);
+  const [editingAction, setEditingAction] =
+    useState<CrawlerStepActionRow | null>(null);
 
   const skip = !Number.isFinite(id) || id <= 0;
 
@@ -120,15 +101,17 @@ export default function CrawlerConfigDetailPage() {
   const [updateLocator, { isLoading: updatingLocator }] =
     useUpdateCrawlerStepLocatorMutation();
   const [deleteLocator] = useDeleteCrawlerStepLocatorMutation();
+  const [addAction, { isLoading: addingAction }] =
+    useAddCrawlerStepActionMutation();
+  const [updateAction, { isLoading: updatingAction }] =
+    useUpdateCrawlerStepActionMutation();
+  const [deleteAction] = useDeleteCrawlerStepActionMutation();
 
   const sourceSearchBody = useMemo(() => ({ page: 1, pageSize: 500 }), []);
   const { data: sourcesPage } = useSearchCrawlerSourcesQuery(sourceSearchBody);
   const sources = sourcesPage?.items ?? [];
 
-  const scriptSearchBody = useMemo(
-    () => ({ page: 1, pageSize: 200 }),
-    []
-  );
+  const scriptSearchBody = useMemo(() => ({ page: 1, pageSize: 200 }), []);
   const { data: scriptsPage } = useSearchCustomScriptsQuery(scriptSearchBody);
   const scripts: CrawlerCustomScriptRow[] = scriptsPage?.items ?? [];
 
@@ -150,8 +133,7 @@ export default function CrawlerConfigDetailPage() {
       seedUrlsText: (detail.seedUrls ?? []).join("\n"),
       crawlerType: (detail.crawlerType ?? "http").toLowerCase(),
       parseType: detail.parseType ?? "HTML",
-      sourceLabel:
-        typeof paramsObj.source === "string" ? paramsObj.source : "",
+      sourceLabel: typeof paramsObj.source === "string" ? paramsObj.source : "",
       minWordCount:
         typeof paramsObj.min_word_count === "number"
           ? paramsObj.min_word_count
@@ -169,46 +151,56 @@ export default function CrawlerConfigDetailPage() {
   const steps = useMemo(
     () =>
       [...(detail?.crawlerSteps ?? [])].sort(
-        (a, b) => (a.stepOrder ?? 0) - (b.stepOrder ?? 0)
+        (a, b) => (a.stepOrder ?? 0) - (b.stepOrder ?? 0),
       ),
-    [detail?.crawlerSteps]
+    [detail?.crawlerSteps],
   );
 
-  // Always derive the live step from the up-to-date `steps` array so that
-  // the drawers reflect data after RTK Query refetches on mutation.
   const liveFieldsStep = useMemo(
     () =>
       fieldsDrawerStep?.id
         ? (steps.find((s) => s.id === fieldsDrawerStep.id) ?? fieldsDrawerStep)
         : fieldsDrawerStep,
-    [fieldsDrawerStep, steps]
+    [fieldsDrawerStep, steps],
   );
 
   const liveLocatorsStep = useMemo(
     () =>
       locatorsDrawerStep?.id
-        ? (steps.find((s) => s.id === locatorsDrawerStep.id) ?? locatorsDrawerStep)
+        ? (steps.find((s) => s.id === locatorsDrawerStep.id) ??
+          locatorsDrawerStep)
         : locatorsDrawerStep,
-    [locatorsDrawerStep, steps]
+    [locatorsDrawerStep, steps],
+  );
+
+  const liveActionsStep = useMemo(
+    () =>
+      actionsDrawerStep?.id
+        ? (steps.find((s) => s.id === actionsDrawerStep.id) ?? actionsDrawerStep)
+        : actionsDrawerStep,
+    [actionsDrawerStep, steps],
   );
 
   const saveConfig = async () => {
     const v = await form.validateFields();
-    const seedUrls = String(v.seedUrlsText || "")
+    const seedUrls = String(stepRequest.seedUrlsText || "")
       .split(/[\n,]+/)
       .map((s: string) => s.trim())
       .filter(Boolean);
     const payload: CrawlerParametersPayload = {};
-    if (v.sourceLabel?.trim()) {
-      payload.source = v.sourceLabel.trim();
+    if (stepRequest.sourceLabel?.trim()) {
+      payload.source = stepRequest.sourceLabel.trim();
     }
-    if (v.minWordCount != null && v.minWordCount >= 0) {
-      payload.min_word_count = Number(v.minWordCount);
+    if (stepRequest.minWordCount != null && stepRequest.minWordCount >= 0) {
+      payload.min_word_count = Number(stepRequest.minWordCount);
     }
     let parameters = mergeParametersJson(undefined, payload);
-    if (v.parametersExtra?.trim()) {
+    if (stepRequest.parametersExtra?.trim()) {
       try {
-        const extra = JSON.parse(v.parametersExtra) as Record<string, unknown>;
+        const extra = JSON.parse(stepRequest.parametersExtra) as Record<
+          string,
+          unknown
+        >;
         parameters = JSON.stringify({
           ...JSON.parse(parameters),
           ...extra,
@@ -219,15 +211,18 @@ export default function CrawlerConfigDetailPage() {
       }
     }
     const body: CrawlerConfigRequestBody = {
-      sourceId: v.sourceId ?? null,
-      name: v.name,
-      crawlerType: v.crawlerType,
-      parseType: v.parseType,
+      sourceId: stepRequest.sourceId ?? null,
+      name: stepRequest.name,
+      crawlerType: stepRequest.crawlerType,
+      parseType: stepRequest.parseType,
       seedUrls,
-      isActive: v.isActive,
-      frequencyMinutes: Math.max(1, Math.round(Number(v.frequencyHours) * 60)),
-      maxDepth: v.maxDepth,
-      maxRetry: v.maxRetry,
+      isActive: stepRequest.isActive,
+      frequencyMinutes: Math.max(
+        1,
+        Math.round(Number(stepRequest.frequencyHours) * 60),
+      ),
+      maxDepth: stepRequest.maxDepth,
+      maxRetry: stepRequest.maxRetry,
       parameters,
     };
     try {
@@ -238,114 +233,144 @@ export default function CrawlerConfigDetailPage() {
     }
   };
 
-  const openAddStep = () => {
+  const openStepForm = (step?: CrawlerStepModel) => {
     const nextOrder =
       steps.reduce((m, s) => Math.max(m, s.stepOrder ?? 0), 0) + 1;
-    setEditingStep({
+    const target: CrawlerStepModel = step ?? {
       stepOrder: nextOrder,
       stepName: `Bước ${nextOrder}`,
       stepType: "fetch",
       requestMethod: "GET",
       delaySeconds: 0,
-    });
-    stepForm.resetFields();
-    stepForm.setFieldsValue({
-      stepOrder: nextOrder,
-      stepName: `Bước ${nextOrder}`,
-      stepType: "fetch",
-      requestMethod: "GET",
-      delaySeconds: 0,
-      extraConfigText: "",
-      browser: "selenium",
-      multiloginFolderId: "",
-      multiloginProfileId: "",
-      loginUrl: "",
-      loginEmail: "",
-      loginPassword: "",
-    });
-    setStepModalOpen(true);
-  };
-
-  const openEditStep = (s: CrawlerStepModel) => {
-    setEditingStep(s);
+    };
+    setEditingStep(target);
     let cfg: Record<string, unknown> = {};
     try {
-      const raw = typeof s.extraConfig === "string" ? s.extraConfig : JSON.stringify(s.extraConfig ?? {});
+      const raw =
+        typeof target.extraConfig === "string"
+          ? target.extraConfig
+          : JSON.stringify(target.extraConfig ?? {});
       cfg = JSON.parse(raw);
-    } catch { /* ignore */ }
+    } catch {
+      /* ignore */
+    }
+    stepForm.resetFields();
     stepForm.setFieldsValue({
-      ...s,
-      stepType: (s.stepType ?? "fetch").toLowerCase(),
-      extraConfigText: cfg && Object.keys(cfg).length > 0 ? JSON.stringify(cfg, null, 2) : "",
-      // Browser config fields
+      ...target,
+      stepType: (target.stepType ?? "fetch").toLowerCase(),
+      extraConfigText:
+        cfg && Object.keys(cfg).length > 0 ? JSON.stringify(cfg, null, 2) : "",
       browser: (cfg.browser as string) ?? "selenium",
       multiloginFolderId: (cfg.multilogin_folder_id as string) ?? "",
       multiloginProfileId: (cfg.multilogin_profile_id as string) ?? "",
       loginUrl: (cfg.login_url as string) ?? "",
       loginEmail: (cfg.login_email as string) ?? "",
       loginPassword: (cfg.login_password as string) ?? "",
+      scriptGetEmailSelector: (cfg.script_get_email_selector as string) ?? "",
+      scriptGetPasswordSelector: (cfg.script_get_password_selector as string) ?? "",
+      scriptGetSubmitSelector: (cfg.script_get_submit_selector as string) ?? "",
     });
     setStepModalOpen(true);
   };
 
-  const BROWSER_STEP_TYPES = ["navigate", "interact", "python_crawl"];
+  const DYNAMIC_STEP_TYPES = ["interact"];
 
   const saveStep = async () => {
-    const v = await stepForm.validateFields();
-    let extraConfig: string | undefined;
-
-    // Parse existing raw JSON (if any)
+    const stepRequest = await stepForm.validateFields();
+    console.log("saveStep: ", stepRequest);
     let configObj: Record<string, unknown> = {};
-    if (v.extraConfigText?.trim()) {
+    if (stepRequest.extraConfigText?.trim()) {
       try {
-        configObj = JSON.parse(v.extraConfigText);
+        configObj = JSON.parse(stepRequest.extraConfigText);
       } catch {
         message.error("Cấu hình nâng cao (JSON) không hợp lệ");
         return;
       }
     }
 
-    // Merge structured browser-config fields for browser-based steps
-    if (BROWSER_STEP_TYPES.includes(v.stepType)) {
-      if (v.browser && v.browser !== "selenium") configObj.browser = v.browser;
-      else delete configObj.browser; // "selenium" is the default — no need to persist it
+    if (
+      DYNAMIC_STEP_TYPES.includes(stepRequest.stepType) ||
+      (stepRequest.isDynamic &&
+        stepRequest.isDynamic === true &&
+        stepRequest.stepType === "fetch")
+    ) {
+      if (stepRequest.browser && stepRequest.browser !== "selenium")
+        configObj.browser = stepRequest.browser;
+      else delete configObj.browser;
 
-      if (v.browser === "multilogin") {
-        if (v.multiloginFolderId?.trim()) configObj.multilogin_folder_id = v.multiloginFolderId.trim();
-        if (v.multiloginProfileId?.trim()) configObj.multilogin_profile_id = v.multiloginProfileId.trim();
+      if (stepRequest.browser === "multilogin") {
+        if (stepRequest.multiloginFolderId?.trim())
+          configObj.multilogin_folder_id =
+            stepRequest.multiloginFolderId.trim();
+        if (stepRequest.multiloginProfileId?.trim())
+          configObj.multilogin_profile_id =
+            stepRequest.multiloginProfileId.trim();
       } else {
         delete configObj.multilogin_folder_id;
         delete configObj.multilogin_profile_id;
       }
-
-      if (v.loginUrl?.trim()) configObj.login_url = v.loginUrl.trim();
-      else delete configObj.login_url;
-      if (v.loginEmail?.trim()) configObj.login_email = v.loginEmail.trim();
-      else delete configObj.login_email;
-      if (v.loginPassword?.trim()) configObj.login_password = v.loginPassword.trim();
-      else delete configObj.login_password;
+    } else {
+      delete configObj.browser;
+      delete configObj.multilogin_folder_id;
+      delete configObj.multilogin_profile_id;
     }
 
-    extraConfig = Object.keys(configObj).length > 0 ? JSON.stringify(configObj) : undefined;
+    if (
+      DYNAMIC_STEP_TYPES.includes(stepRequest.stepType) ||
+      (stepRequest.isDynamic &&
+        stepRequest.isDynamic === true &&
+        stepRequest.stepType === "fetch")
+    ) {
+      if (stepRequest.loginUrl?.trim())
+        configObj.login_url = stepRequest.loginUrl.trim();
+      else delete configObj.login_url;
+      if (stepRequest.loginEmail?.trim())
+        configObj.login_email = stepRequest.loginEmail.trim();
+      else delete configObj.login_email;
+      if (stepRequest.loginPassword?.trim())
+        configObj.login_password = stepRequest.loginPassword.trim();
+      else delete configObj.login_password;
+      if (stepRequest.scriptGetEmailSelector?.trim())
+        configObj.script_get_email_selector = stepRequest.scriptGetEmailSelector.trim();
+      else delete configObj.script_get_email_selector;
+      if (stepRequest.scriptGetPasswordSelector?.trim())
+        configObj.script_get_password_selector = stepRequest.scriptGetPasswordSelector.trim();
+      else delete configObj.script_get_password_selector;
+      if (stepRequest.scriptGetSubmitSelector?.trim())
+        configObj.script_get_submit_selector = stepRequest.scriptGetSubmitSelector.trim();
+      else delete configObj.script_get_submit_selector;
+    } else {
+      delete configObj.login_url;
+      delete configObj.login_email;
+      delete configObj.login_password;
+      delete configObj.script_get_email_selector;
+      delete configObj.script_get_password_selector;
+      delete configObj.script_get_submit_selector;
+    }
+
+    const extraConfig: string | undefined =
+      Object.keys(configObj).length > 0 ? JSON.stringify(configObj) : undefined;
+
     const base: CrawlerStepRequestBody = {
       crawlerConfigId: id,
-      stepOrder: v.stepOrder,
-      stepName: v.stepName,
-      stepType: v.stepType,
-      requestMethod: v.requestMethod,
-      outputUrlType: v.outputUrlType,
-      delaySeconds: v.delaySeconds ?? 0,
-      customScriptId: v.customScriptId ?? null,
-      extraConfig,
+      isDynamic: stepRequest.isDynamic,
+      filterRegex: stepRequest.filterRegex,
+      stepOrder: stepRequest.stepOrder,
+      stepName: stepRequest.stepName,
+      stepType: stepRequest.stepType ?? "fetch",
+      requestMethod: stepRequest.requestMethod ?? "GET",
+      outputUrlType: stepRequest.outputUrlType ?? "none",
+      delaySeconds: stepRequest.delaySeconds ?? 0,
+      customScriptId: stepRequest.customScriptId ?? null,
+      extraConfig: extraConfig ?? undefined,
     };
     try {
       if (editingStep?.id) {
         await updateStep({ id: editingStep.id, body: base }).unwrap();
-        message.success("Đã cập nhật bước");
       } else {
         await addStep(base).unwrap();
-        message.success("Đã thêm bước");
       }
+      message.success("Đã lưu bước");
       setStepModalOpen(false);
       setEditingStep(null);
     } catch (e) {
@@ -464,6 +489,56 @@ export default function CrawlerConfigDetailPage() {
     }
   };
 
+  const openActionsDrawer = (s: CrawlerStepModel) => {
+    setActionsDrawerStep(s);
+  };
+
+  const openAddAction = () => {
+    setEditingAction(null);
+    setActionModalOpen(true);
+  };
+
+  const openEditAction = (a: CrawlerStepActionRow) => {
+    setEditingAction(a);
+    setActionModalOpen(true);
+  };
+
+  const saveAction = async (body: CrawlerStepActionRequestBody) => {
+    if (!liveActionsStep?.id) return;
+    try {
+      if (editingAction?.id) {
+        await updateAction({ id: editingAction.id, body, crawlerConfigId: id }).unwrap();
+        message.success("Đã cập nhật action");
+      } else {
+        await addAction({ body, crawlerConfigId: id }).unwrap();
+        message.success("Đã thêm action");
+      }
+      setActionModalOpen(false);
+      setEditingAction(null);
+    } catch (e) {
+      message.error(e instanceof Error ? e.message : "Lưu action thất bại");
+    }
+  };
+
+  const removeAction = (a: CrawlerStepActionRow) => {
+    if (!a.id) return;
+    modal.confirm({
+      title: "Xóa action?",
+      content: `${a.actionType}${a.locatorValue ? ` — ${a.locatorValue}` : ""}`,
+      okText: "Xóa",
+      cancelText: "Hủy",
+      okType: "danger",
+      onOk: async () => {
+        try {
+          await deleteAction({ id: a.id!, crawlerConfigId: id }).unwrap();
+          message.success("Đã xóa action");
+        } catch (e) {
+          message.error(e instanceof Error ? e.message : "Xóa thất bại");
+        }
+      },
+    });
+  };
+
   const removeLocator = (loc: CrawlerStepLocatorRow) => {
     if (!loc.id) return;
     modal.confirm({
@@ -483,73 +558,13 @@ export default function CrawlerConfigDetailPage() {
     });
   };
 
-  const stepColumns: ColumnsType<CrawlerStepModel> = [
-    { title: "TT", dataIndex: "stepOrder", width: 60 },
-    { title: "Tên", dataIndex: "stepName", width: 160, ellipsis: true },
-    {
-      title: "Loại",
-      dataIndex: "stepType",
-      width: 120,
-      render: (t: string) => {
-        const opt = STEP_TYPE_OPTIONS.find((o) => o.value === t);
-        return <Tag title={opt?.hint}>{opt?.label ?? t}</Tag>;
-      },
-    },
-    { title: "Method", dataIndex: "requestMethod", width: 80 },
-    {
-      title: "Locators",
-      width: 110,
-      align: "center",
-      render: (_, s) => (
-        <Button type="link" onClick={() => openLocatorsDrawer(s)}>
-          {s.locators?.length ?? 0} locator
-        </Button>
-      ),
-    },
-    {
-      title: "Script",
-      width: 140,
-      ellipsis: true,
-      render: (_, s) => s.customScript?.name ?? s.customScriptId ?? "—",
-    },
-    {
-      title: "Fields",
-      width: 120,
-      align: "center",
-      render: (_, s) => (
-        <Button type="link" onClick={() => openFieldsDrawer(s)}>
-          {(s.crawlerFields?.length ?? 0)} field
-        </Button>
-      ),
-    },
-    {
-      title: "Thao tác",
-      width: 96,
-      fixed: "right",
-      align: "center",
-      render: (_, s) => (
-        <Flex gap={4} justify="center">
-          <Tooltip title="Sửa bước">
-            <Button
-              type="text"
-              icon={<EditOutlined />}
-              aria-label="Sửa bước"
-              onClick={() => openEditStep(s)}
-            />
-          </Tooltip>
-          <Tooltip title="Xóa bước">
-            <Button
-              type="text"
-              danger
-              icon={<DeleteOutlined />}
-              aria-label="Xóa bước"
-              onClick={() => removeStep(s)}
-            />
-          </Tooltip>
-        </Flex>
-      ),
-    },
-  ];
+  const stepColumns = CreateCrawlerStepColumns({
+    onOpenLocators: openLocatorsDrawer,
+    onOpenFields: openFieldsDrawer,
+    onOpenActions: openActionsDrawer,
+    onEditStep: openStepForm,
+    onRemoveStep: removeStep,
+  });
 
   const tableBusy = isLoading || isFetching;
 
@@ -571,445 +586,54 @@ export default function CrawlerConfigDetailPage() {
   return (
     <>
       <Flex vertical gap="large" style={{ width: "100%" }}>
-        <Flex align="center" justify="space-between" gap={16} wrap>
-          <Flex align="center" gap={12} wrap>
-            <Button icon={<ArrowLeftOutlined />} onClick={() => router.push("/crawler/config")}>
-              Quay lại
-            </Button>
-            <Title level={4} style={{ margin: 0 }}>
-              {detail?.name ?? "Chi tiết cấu hình"}
-            </Title>
-            {detail && (
-              <Tag color={detail.isActive ? "success" : "default"}>
-                {detail.isActive ? "Hoạt động" : "Tắt"}
-              </Tag>
-            )}
-          </Flex>
-        </Flex>
+        <CrawlerConfigDetailHeader
+          title={detail?.name ?? "Chi tiết cấu hình"}
+          isActive={detail?.isActive}
+          showStatusTag={!!detail}
+          onBack={() => router.push("/crawler/config")}
+        />
 
-        <Card title="Thông tin cấu hình" loading={tableBusy && !detail}>
-          <Form
-            form={form}
-            layout="vertical"
-            requiredMark={false}
-            scrollToFirstError
-          >
-            <Form.Item name="name" label="Tên cấu hình" rules={[{ required: true }]}>
-              <Input allowClear />
-            </Form.Item>
-            <Form.Item
-              name="seedUrlsText"
-              label="URL nguồn"
-              extra="Mỗi dòng một URL, hoặc phân tách bằng dấu phẩy"
-              rules={[{ required: true }]}
-            >
-              <Input.TextArea rows={4} placeholder="https://…" />
-            </Form.Item>
-            <Row gutter={[16, 8]}>
-              <Col xs={24} md={12}>
-                <Form.Item name="crawlerType" label="Loại crawler" rules={[{ required: true }]}>
-                  <Select
-                    showSearch
-                    optionFilterProp="label"
-                    options={CRAWLER_TYPE_OPTIONS.map((o) => ({
-                      value: o.value,
-                      label: `${o.label} — ${o.hint}`,
-                    }))}
-                  />
-                </Form.Item>
-              </Col>
-              <Col xs={24} md={12}>
-                <Form.Item name="parseType" label="Kiểu parse" rules={[{ required: true }]}>
-                  <Select options={PARSE_TYPES.map((t) => ({ label: t, value: t }))} />
-                </Form.Item>
-              </Col>
-            </Row>
-            <Row gutter={[16, 8]}>
-              <Col xs={24} md={12}>
-                <Form.Item name="sourceId" label="Nguồn dữ liệu">
-                  <Select
-                    allowClear
-                    showSearch
-                    optionFilterProp="label"
-                    placeholder="Chọn crawler_source"
-                    options={sources.map((src) => ({
-                      value: src.id,
-                      label: `${src.name ?? src.id}${src.platform ? ` — ${src.platform}` : ""}`,
-                    }))}
-                  />
-                </Form.Item>
-              </Col>
-              <Col xs={24} md={12}>
-                <Form.Item
-                  name="sourceLabel"
-                  label="Tên nguồn (metadata)"
-                  tooltip="Ghi vào parameters.source nếu cần ghi đè"
-                >
-                  <Input placeholder="VnExpress, News API…" allowClear />
-                </Form.Item>
-              </Col>
-              <Col xs={24} sm={12} md={8}>
-                <Form.Item
-                  name="minWordCount"
-                  label="min_word_count"
-                  tooltip="Document dưới ngưỡng bị skip (Topic Modelling)"
-                >
-                  <InputNumber min={0} style={{ width: "100%" }} />
-                </Form.Item>
-              </Col>
-            </Row>
-            <Row gutter={[16, 8]}>
-              <Col xs={24} sm={12} md={6}>
-                <Form.Item name="isActive" label="Hoạt động" valuePropName="checked">
-                  <Switch />
-                </Form.Item>
-              </Col>
-              <Col xs={24} sm={12} md={6}>
-                <Form.Item name="frequencyHours" label="Tần suất (giờ)" rules={[{ required: true }]}>
-                  <InputNumber min={0.05} step={0.5} style={{ width: "100%" }} />
-                </Form.Item>
-              </Col>
-              <Col xs={24} sm={12} md={6}>
-                <Form.Item name="maxDepth" label="maxDepth">
-                  <InputNumber min={1} max={50} style={{ width: "100%" }} />
-                </Form.Item>
-              </Col>
-              <Col xs={24} sm={12} md={6}>
-                <Form.Item name="maxRetry" label="maxRetry">
-                  <InputNumber min={0} max={20} style={{ width: "100%" }} />
-                </Form.Item>
-              </Col>
-            </Row>
-            <Divider orientationMargin={0}>Tham số mở rộng</Divider>
-            <Form.Item
-              name="parametersExtra"
-              label="JSON bổ sung (parameters)"
-              tooltip="Không lặp source / min_word_count — đã có ô phía trên"
-            >
-              <Input.TextArea rows={6} placeholder='{"lang":"vi"}' />
-            </Form.Item>
-            <Form.Item>
-              <Button type="primary" onClick={() => void saveConfig()} loading={saving}>
-                Lưu cấu hình
-              </Button>
-            </Form.Item>
-          </Form>
-        </Card>
+        <CrawlerConfigInfoFormCard
+          form={form}
+          sources={sources}
+          loading={tableBusy && !detail}
+          saving={saving}
+          onSave={saveConfig}
+        />
 
-        <Card
-          title="Pipeline — các bước"
-          extra={
-            <Button type="primary" icon={<PlusOutlined />} onClick={openAddStep}>
-              Thêm bước
-            </Button>
-          }
-        >
-          <Table<CrawlerStepModel>
-            rowKey={(r) => String(r.id ?? `new-${r.stepOrder}`)}
-            size="middle"
-            bordered
-            loading={tableBusy}
-            columns={stepColumns}
-            dataSource={steps}
-            scroll={{ x: 1000 }}
-            pagination={false}
-            locale={{
-              emptyText: (
-                <Empty
-                  image={Empty.PRESENTED_IMAGE_SIMPLE}
-                  description="Chưa có bước — thêm bước FETCH hoặc NAVIGATE"
-                />
-              ),
-            }}
-          />
-        </Card>
+        <CrawlerPipelineCard
+          steps={steps}
+          loading={tableBusy}
+          columns={stepColumns}
+          onAddStep={() => openStepForm()}
+        />
+
+        <CrawlerStepConfig
+          stepModalOpen={stepModalOpen}
+          stepForm={stepForm}
+          watchedStepType={watchedStepType}
+          watchedBrowser={watchedBrowser}
+          scripts={scripts}
+          onCancelStepModal={() => {
+            setStepModalOpen(false);
+            setEditingStep(null);
+          }}
+          onSaveStep={saveStep}
+        />
       </Flex>
 
-      <Modal
-        title={editingStep?.id ? "Sửa bước" : "Thêm bước"}
-        open={stepModalOpen}
-        onCancel={() => {
-          setStepModalOpen(false);
-          setEditingStep(null);
-        }}
-        onOk={() => void saveStep()}
-        okText="Lưu"
-        cancelText="Hủy"
-        width={720}
-        destroyOnHidden
-        centered
-        styles={{ body: { paddingTop: 8 } }}
-      >
-        <Form
-          form={stepForm}
-          layout="vertical"
-          requiredMark={false}
-          scrollToFirstError
-          style={{ marginTop: 4 }}
-        >
-          <div
-            style={{
-              border: "1px solid var(--ant-colorBorderSecondary)",
-              borderRadius: 10,
-              padding: "12px 14px 4px",
-              marginBottom: 12,
-              background: "var(--ant-colorFillQuaternary)",
-            }}
-          >
-            <Text strong style={{ display: "block", marginBottom: 10 }}>
-              Thông tin chính
-            </Text>
-            <Row gutter={[16, 8]}>
-              <Col xs={24} sm={8}>
-                <Form.Item name="stepOrder" label="Thứ tự" rules={[{ required: true }]}>
-                  <InputNumber min={0} style={{ width: "100%" }} />
-                </Form.Item>
-              </Col>
-              <Col xs={24} sm={16}>
-                <Form.Item name="stepName" label="Tên bước" rules={[{ required: true }]}>
-                  <Input allowClear />
-                </Form.Item>
-              </Col>
-            </Row>
-            <Row gutter={[16, 8]}>
-              <Col xs={24} sm={10}>
-                <Form.Item name="stepType" label="Loại bước" rules={[{ required: true }]}>
-                  <Select
-                    showSearch
-                    optionFilterProp="label"
-                    options={STEP_TYPE_OPTIONS.map((o) => ({
-                      value: o.value,
-                      label: o.label.toUpperCase(),
-                    }))}
-                  />
-                </Form.Item>
-              </Col>
-              <Col xs={24} sm={7}>
-                <Form.Item name="requestMethod" label="Phương thức HTTP">
-                  <Select options={REQUEST_METHODS.map((t) => ({ label: t, value: t }))} />
-                </Form.Item>
-              </Col>
-              <Col xs={24} sm={7}>
-                <Form.Item name="delaySeconds" label="Delay (giây)">
-                  <InputNumber min={0} style={{ width: "100%" }} />
-                </Form.Item>
-              </Col>
-            </Row>
-          </div>
-
-          <div
-            style={{
-              border: "1px solid var(--ant-colorBorderSecondary)",
-              borderRadius: 10,
-              padding: "12px 14px 4px",
-              background: "var(--ant-colorBgContainer)",
-            }}
-          >
-            <Text strong style={{ display: "block", marginBottom: 10 }}>
-              Nâng cao
-            </Text>
-            <Form.Item name="outputUrlType" label="Kiểu URL đầu ra">
-              <Select
-                allowClear
-                options={OUTPUT_URL_TYPE_OPTIONS.map((o) => ({
-                  value: o.value,
-                  label: `${o.label} — ${o.hint}`,
-                }))}
-              />
-            </Form.Item>
-            <Form.Item name="customScriptId" label="Script tùy chỉnh">
-              <Select
-                allowClear
-                showSearch
-                optionFilterProp="label"
-                placeholder="Chọn script"
-                options={scripts.map((s) => ({
-                  value: s.id,
-                  label: `${s.name ?? s.id} (${s.language ?? "?"})`,
-                }))}
-              />
-            </Form.Item>
-            {/* ── Browser Config (NAVIGATE / INTERACT / PYTHON_CRAWL) ─────────── */}
-            {["navigate", "interact"].includes(watchedStepType) && (
-              <>
-                <Divider orientation="left" plain style={{ marginTop: 4, marginBottom: 12 }}>
-                  Trình duyệt
-                </Divider>
-                <Row gutter={[16, 8]}>
-                  <Col xs={24} sm={8}>
-                    <Form.Item name="browser" label="Browser engine" initialValue="selenium">
-                      <Select
-                        options={[
-                          { value: "selenium", label: "Selenium (mặc định)" },
-                          { value: "multilogin", label: "Multilogin (chống bot)" },
-                          { value: "local_chrome", label: "Local Chrome (Chrome đang mở)" },
-                        ]}
-                      />
-                    </Form.Item>
-                  </Col>
-                  {watchedBrowser === "multilogin" && (
-                    <>
-                      <Col xs={24} sm={8}>
-                        <Form.Item
-                          name="multiloginFolderId"
-                          label="Multilogin Folder ID"
-                          rules={[{ required: true, message: "Nhập Folder ID" }]}
-                        >
-                          <Input placeholder="xxxxxxxx-xxxx-xxxx-xxxx-xxxxxxxxxxxx" />
-                        </Form.Item>
-                      </Col>
-                      <Col xs={24} sm={8}>
-                        <Form.Item
-                          name="multiloginProfileId"
-                          label="Multilogin Profile ID"
-                          rules={[{ required: true, message: "Nhập Profile ID" }]}
-                        >
-                          <Input placeholder="yyyyyyyy-yyyy-yyyy-yyyy-yyyyyyyyyyyy" />
-                        </Form.Item>
-                      </Col>
-                    </>
-                  )}
-                </Row>
-              </>
-            )}
-
-            {/* ── Login Config (NAVIGATE / INTERACT / PYTHON_CRAWL) ────────── */}
-            {["navigate", "interact", "python_crawl"].includes(watchedStepType) && (
-              <>
-                <Divider orientation="left" plain style={{ marginTop: 4, marginBottom: 12 }}>
-                  Login (tuỳ chọn)
-                </Divider>
-                <Row gutter={[16, 8]}>
-                  <Col xs={24} sm={24}>
-                    <Form.Item name="loginUrl" label="Login URL">
-                      <Input placeholder="https://example.com/login" allowClear />
-                    </Form.Item>
-                  </Col>
-                  <Col xs={24} sm={12}>
-                    <Form.Item name="loginEmail" label="Email / Tài khoản">
-                      <Input placeholder="user@example.com" allowClear />
-                    </Form.Item>
-                  </Col>
-                  <Col xs={24} sm={12}>
-                    <Form.Item name="loginPassword" label="Mật khẩu">
-                      <Input.Password placeholder="••••••••" />
-                    </Form.Item>
-                  </Col>
-                </Row>
-              </>
-            )}
-
-            <Divider orientation="left" plain style={{ marginTop: 4, marginBottom: 12 }}>
-              Cấu hình khác (JSON)
-            </Divider>
-            <Form.Item name="extraConfigText" label={null}>
-              <Input.TextArea rows={4} placeholder='{"scroll_times": 10, "scroll_wait_ms": 2000}' />
-            </Form.Item>
-          </div>
-        </Form>
-      </Modal>
-
-      <Drawer
-        title={
-          liveFieldsStep
-            ? `Danh sách field — ${liveFieldsStep.stepName ?? "bước"} (#${liveFieldsStep.stepOrder})`
-            : "Field"
-        }
-        width={720}
+      <CrawlerStepFieldsDrawer
         open={!!fieldsDrawerStep}
-        destroyOnHidden
+        step={liveFieldsStep}
         onClose={() => {
           setFieldsDrawerStep(null);
           setEditingField(null);
           setFieldModalOpen(false);
         }}
-        extra={
-          <Button
-            type="primary"
-            icon={<PlusOutlined />}
-            disabled={!liveFieldsStep?.id}
-            onClick={openAddField}
-          >
-            Thêm trường
-          </Button>
-        }
-        styles={{ body: { paddingBottom: 24 } }}
-      >
-        {!liveFieldsStep?.id && (
-          <Alert
-            type="warning"
-            showIcon
-            style={{ marginBottom: 16 }}
-            message="Lưu cấu hình và tạo bước trước khi thêm field."
-          />
-        )}
-        <Table<CrawlerFieldRow>
-          rowKey={(r) => String(r.id ?? r.fieldName)}
-          size="small"
-          bordered
-          pagination={false}
-          dataSource={liveFieldsStep?.crawlerFields ?? []}
-          locale={{
-            emptyText: (
-              <Empty
-                image={Empty.PRESENTED_IMAGE_SIMPLE}
-                description="Chưa có field cho bước này"
-              />
-            ),
-          }}
-          columns={[
-            { title: "Tên", dataIndex: "fieldName", width: 120, ellipsis: true },
-            { title: "Kiểu", dataIndex: "fieldType", width: 90 },
-            {
-              title: "extract_path",
-              dataIndex: "extractPath",
-              ellipsis: true,
-              render: (t: string) => t || "—",
-            },
-            {
-              title: "transform",
-              dataIndex: "transformRule",
-              width: 120,
-              ellipsis: true,
-              render: (t: string) => t || "—",
-            },
-            {
-              title: "Bắt buộc",
-              dataIndex: "isRequired",
-              width: 72,
-              align: "center",
-              render: (v: boolean) => (v ? <Tag color="processing">Có</Tag> : "—"),
-            },
-            {
-              title: "Thao tác",
-              width: 96,
-              align: "center",
-              fixed: "right",
-              render: (_, f) => (
-                <Flex gap={4} justify="center">
-                  <Tooltip title="Sửa field">
-                    <Button
-                      type="text"
-                      size="small"
-                      icon={<EditOutlined />}
-                      onClick={() => openEditField(f)}
-                    />
-                  </Tooltip>
-                  <Tooltip title="Xóa field">
-                    <Button
-                      type="text"
-                      size="small"
-                      danger
-                      icon={<DeleteOutlined />}
-                      onClick={() => removeField(f)}
-                    />
-                  </Tooltip>
-                </Flex>
-              ),
-            },
-          ]}
-        />
-      </Drawer>
+        onAddField={openAddField}
+        onEditField={openEditField}
+        onRemoveField={removeField}
+      />
 
       <FieldFormModal
         open={fieldModalOpen && !!liveFieldsStep?.id}
@@ -1024,116 +648,18 @@ export default function CrawlerConfigDetailPage() {
         onSubmit={saveField}
       />
 
-      {/* ─── Locators Drawer ──────────────────────────────────────── */}
-      <Drawer
-        title={
-          liveLocatorsStep
-            ? `Locators — ${liveLocatorsStep.stepName ?? "bước"} (#${liveLocatorsStep.stepOrder})`
-            : "Locators"
-        }
-        width={680}
+      <CrawlerStepLocatorsDrawer
         open={!!locatorsDrawerStep}
-        destroyOnHidden
+        step={liveLocatorsStep}
         onClose={() => {
           setLocatorsDrawerStep(null);
           setEditingLocator(null);
           setLocatorModalOpen(false);
         }}
-        extra={
-          <Button
-            type="primary"
-            icon={<PlusOutlined />}
-            disabled={!liveLocatorsStep?.id}
-            onClick={openAddLocator}
-          >
-            Thêm locator
-          </Button>
-        }
-        styles={{ body: { paddingBottom: 24 } }}
-      >
-        {!liveLocatorsStep?.id && (
-          <Alert
-            type="warning"
-            showIcon
-            style={{ marginBottom: 16 }}
-            message="Lưu bước trước khi thêm locator."
-          />
-        )}
-        <Table<CrawlerStepLocatorRow>
-          rowKey={(r) => String(r.id ?? r.locatorOrder)}
-          size="small"
-          bordered
-          pagination={false}
-          dataSource={liveLocatorsStep?.locators ?? []}
-          locale={{
-            emptyText: (
-              <Empty
-                image={Empty.PRESENTED_IMAGE_SIMPLE}
-                description="Chưa có locator cho bước này"
-              />
-            ),
-          }}
-          columns={[
-            { title: "TT", dataIndex: "locatorOrder", width: 50, align: "center" },
-            {
-              title: "Loại",
-              dataIndex: "locatorType",
-              width: 90,
-              render: (t: string) => <Tag>{t}</Tag>,
-            },
-            {
-              title: "Giá trị",
-              dataIndex: "locatorValue",
-              ellipsis: true,
-              render: (t: string) => (
-                <Text code style={{ fontSize: 12 }}>
-                  {t}
-                </Text>
-              ),
-            },
-            {
-              title: "target_step",
-              dataIndex: "targetStep",
-              width: 90,
-              render: (t: string) => t || "next",
-            },
-            {
-              title: "filter_regex",
-              dataIndex: "filterRegex",
-              width: 120,
-              ellipsis: true,
-              render: (t: string) => t || "—",
-            },
-            {
-              title: "Thao tác",
-              width: 90,
-              align: "center",
-              fixed: "right",
-              render: (_, loc) => (
-                <Flex gap={4} justify="center">
-                  <Tooltip title="Sửa locator">
-                    <Button
-                      type="text"
-                      size="small"
-                      icon={<EditOutlined />}
-                      onClick={() => openEditLocator(loc)}
-                    />
-                  </Tooltip>
-                  <Tooltip title="Xóa locator">
-                    <Button
-                      type="text"
-                      size="small"
-                      danger
-                      icon={<DeleteOutlined />}
-                      onClick={() => removeLocator(loc)}
-                    />
-                  </Tooltip>
-                </Flex>
-              ),
-            },
-          ]}
-        />
-      </Drawer>
+        onAddLocator={openAddLocator}
+        onEditLocator={openEditLocator}
+        onRemoveLocator={removeLocator}
+      />
 
       <LocatorFormModal
         open={locatorModalOpen && !!liveLocatorsStep?.id}
@@ -1146,6 +672,32 @@ export default function CrawlerConfigDetailPage() {
           setEditingLocator(null);
         }}
         onSubmit={saveLocator}
+      />
+
+      <CrawlerStepActionsDrawer
+        open={!!actionsDrawerStep}
+        step={liveActionsStep}
+        onClose={() => {
+          setActionsDrawerStep(null);
+          setEditingAction(null);
+          setActionModalOpen(false);
+        }}
+        onAddAction={openAddAction}
+        onEditAction={openEditAction}
+        onRemoveAction={removeAction}
+      />
+
+      <ActionFormModal
+        open={actionModalOpen && !!liveActionsStep?.id}
+        title={editingAction?.id ? "Sửa action" : "Thêm action"}
+        confirmLoading={addingAction || updatingAction}
+        crawlerStepId={liveActionsStep?.id ?? 0}
+        initial={editingAction}
+        onCancel={() => {
+          setActionModalOpen(false);
+          setEditingAction(null);
+        }}
+        onSubmit={saveAction}
       />
     </>
   );
